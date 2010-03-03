@@ -1,0 +1,12 @@
+## Interface: 30300
+
+## Title: ShowDoTs
+## Notes: Show Damage over Time debuffs.
+## Author: Adirelle
+## Version: @project-version@ 
+## LoadManagers: AddonLoader
+## X-LoadOn-Always: delayed
+## OptionalDeps: Ace3
+
+ShowDoTs.lua
+
