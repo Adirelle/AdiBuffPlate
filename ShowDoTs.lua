@@ -6,22 +6,36 @@ All rights reserved.
 
 local addonName, ns = ...
 
+local AURAS = {
+	WARLOCK = {
+		(GetSpellInfo(172)), -- Corruption
+		(GetSpellInfo(980)), -- Curse of Agony
+		(GetSpellInfo(348)), -- Immolate
+		(GetSpellInfo(27243)), -- Seed of Corruption
+		(GetSpellInfo(30108)), -- Unstable Afflication
+		(GetSpellInfo(5782)), -- Fear
+		(GetSpellInfo(49892)), -- Death Coil
+		(GetSpellInfo(5484)), -- Howl of Terror
+	}
+}
+
 local addon = LibStub('AceAddon-3.0'):NewAddon(addonName, 'AceEvent-3.0')
 
 local function NewFrameHeap(namePrefix, frameType, parent, template)
 	--local baseFrame = CreateFrame(frameType, nil, parent, template)
 	--local proto = setmetatable({}, {__index = getmetatable(baseFrame).__index})
+	--local meta = {__index = proto}
 	local proto = {}
 	local heap = {}
 	local counter = 1
 	function proto:Acquire(...)
 		local self = next(heap)
 		if not self then
+			--self = setmetatable(CreateFrame(frameType, namePrefix..counter, parent, template), meta)
 			self = CreateFrame(frameType, namePrefix..counter, parent, template)
 			for k,v in pairs(proto) do
 				self[k] = v
 			end
-			--self = setmetatable(CreateFrame(frameType, namePrefix..counter, parent, template), meta)
 			counter = counter + 1
 			if self.OnInitialize then
 				self:OnInitialize()
@@ -49,30 +63,103 @@ end
 local auraProto = NewFrameHeap(addonName.."_Aura", "Frame")
 local unitProto = NewFrameHeap(addonName.."_Unit","Frame")
 local unitFrames = {}
+local anchor
+
+function addon:OnInitialize()
+	local _, class = UnitClass('player')
+	AURAS = AURAS[class]
+	self:SetEnabledState(not not AURAS)
+	if not AURAS then
+		return self:Disable()
+	end
+	
+	anchor = CreateFrame("Frame", nil, UIParent)
+	anchor:SetWidth(0.1)
+	anchor:SetHeight(0.1)
+	anchor:SetPoint("BOTTOMLEFT", 100, 500)
+	anchor:Hide()
+end
 
 function addon:OnEnable()
 	self:RegisterEvent('UNIT_AURA')
+	self:RegisterEvent('UNIT_TARGET')
 	self:RegisterEvent('PLAYER_TARGET_CHANGED')
 	self:RegisterEvent('PLAYER_FOCUS_CHANGED')
 	self:RegisterEvent('COMBAT_LOG_EVENT_UNFILTERED')
 end
 
 function addon:OnDisable()
-	for guid, uf in pairs(unitFrames) do
-		uf:Release()
+	for guid, unitFrame in pairs(unitFrames) do
+		unitFrame:Release()
 	end
 end
 
+local toDelete = {}
 function addon:ScanUnit(unit)
 	local guid = UnitGUID(unit)
 	if not guid then return end
-	local unitFrame = unitFrames[guid]
 	if UnitIsCorpse(unit) or UnitIsDeadOrGhost(unit) or not UnitCanAttack("player", unit) then
-		if unitFrame then
-			unitFrame:Release()
+		if unitFrames[guid] then
+			unitFrames[guid]:Release()
+			self:Layout()
 		end
 		return
 	end
+	local unitFrame = unitFrames[guid]
+	if unitFrame then
+		for spell, aura in pairs(unitFrame.auras) do
+			toDelete[spell] = aura
+		end
+	end
+	local auraCount = 0
+	local updated = false
+	for i, name in ipairs(AURAS) do
+		local found, _, icon, count, _, duration, expireTime, caster = UnitAura(unit, name, "PLAYER")
+		if found and (tonumber(duration) or 0) > 0 then
+			auraCount = auraCount + 1
+			toDelete[name] = nil
+			if not unitFrame then
+				unitFrame = unitProto:Acquire(guid, unit)
+				updated = true
+			end
+			local auraFrame = unitFrame.auras[name]
+			if not auraFrame then
+				auraFrame = auraProto:Acquire(unitFrame, name, icon)
+			end
+			updated = auraFrame:Update(expireTime-duration, duration, count) or updated
+		end
+	end
+	if auraCount == 0 then
+		if unitFrame then
+			wipe(toDelete)
+			unitFrame:Release()
+			self:Layout()
+		end
+	elseif unitFrame then
+		if next(toDelete) then
+			for spell, aura in pairs(toDelete) do
+				aura:Release()
+				updated = true
+			end
+			wipe(toDelete)
+		end
+		if updated then
+			unitFrame:Layout()
+			self:Layout()
+		end
+	end
+end
+
+function addon:Layout()
+	local prevFrame, point = anchor, "BOTTOMLEFT"
+	for guid, unitFrame in pairs(unitFrames) do
+		unitFrame:SetPoint("BOTTOMLEFT", prevFrame, point)
+		prevFrame, point = unitFrame, "TOPLEFT"
+	end
+end
+
+function addon:UNIT_TARGET(event, unit)
+	return self:ScanUnit((unit.."target"):gsub("(%d+)(target)$", "%2%1"))
 end
 
 function addon:UNIT_AURA(event, unit)
@@ -94,11 +181,19 @@ end
 
 function unitProto:OnInitialize()
 	self.auras = {}
+	
+	self:SetWidth(32)
+	self:SetHeight(32)
+	
+	local portrait = self:CreateTexture(nil, "OVERLAY")	
+	portrait:SetAllPoints(self)
+	self.Portrait = portrait
 end
 
 function unitProto:OnAcquire(guid, unit)
+	SetPortraitTexture(self.Portrait, unit)
 	self.guid = guid
-	units[guid] = self
+	unitFrames[guid] = self
 	self:Show()
 end
 
@@ -106,6 +201,24 @@ function unitProto:OnRelease()
 	units[self.guid] = nil
 	for spell, aura in pairs(self.auras) do
 		aura:Release()
+	end
+end
+
+local function SortAuras(a, b)
+	return a.expireTime > b.expireTime
+end
+
+do
+	local tmp = {}
+	function unitProto:Layout()
+		for spell, aura in pairs(self.auras) do
+			tinsert(tmp, aura)
+		end
+		table.sort(tmp, SortAuras)
+		for i, aura in ipairs(tmp) do
+			aura:SetPoint("BOTTOMLEFT", tmp[i-1] or self, "BOTTOMRIGHT", 0, 0)
+		end
+		wipe(tmp)
 	end
 end
 
@@ -146,12 +259,12 @@ function auraProto:OnInitialize()
 	self.Count = count
 end
 
-function auraProto:OnAcquire(unitFrame, spell, texture, start, duration, count)
+function auraProto:OnAcquire(unitFrame, spell, texture)
 	self.spell = spell
+	self.unitFrame = unitFrame
 	self:SetTexture(texture)
 	self:SetParent(unitFrame)
-	self.unitFrame = unitFrame
-	self:Update(start, duration, count)
+	unitFrame.auras[spell] = self
 	self:Show()
 end
 
@@ -161,16 +274,19 @@ function auraProto:OnRelease()
 end
 
 function auraProto:Update(start, duration, count)
-	self.start, self.duration, self.count = start, duration, count
-	self:SetDuration(start, duration)
-	self:SetCount(count)
+	if self.start ~= start or self.duration ~= duration or self.count ~= count then
+		self.start, self.duration, self.count = start, duration, count
+		self:SetDuration(start, duration)
+		self:SetCount(count)
+		return true
+	end
 end
 
 function auraProto:OnUpdate(elapsed)
 	local now = GetTime()
 	local timeLeft = self.expireTime - now
 	if timeLeft <=0 then
-		self:Hide()
+		self:Release()
 	elseif timeLeft < self.flashTime then
 		local alpha = now % 1
 		if alpha < 0.5 then
