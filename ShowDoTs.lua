@@ -5,16 +5,16 @@ All rights reserved.
 --]]
 
 local addonName, ns = ...
-
-local ICON_SIZE = 24
+local ICON_SIZE = 16
 
 local AURAS = {
 	WARLOCK = {
 		(GetSpellInfo(172)), -- Corruption
-		(GetSpellInfo(980)), -- Curse of Agony
-		(GetSpellInfo(348)), -- Immolate
-		(GetSpellInfo(27243)), -- Seed of Corruption
+		(GetSpellInfo(48181)), -- Haunt
 		(GetSpellInfo(30108)), -- Unstable Afflication
+		(GetSpellInfo(980)), -- Curse of Agony
+		(GetSpellInfo(27243)), -- Seed of Corruption
+		(GetSpellInfo(348)), -- Immolate
 		(GetSpellInfo(5782)), -- Fear
 		(GetSpellInfo(49892)), -- Death Coil
 		(GetSpellInfo(5484)), -- Howl of Terror
@@ -29,6 +29,8 @@ local AURAS = {
 local DEFAULT_CONFIG = {
 	anchor = {}
 }
+
+local LibNameplate = LibStub('LibNameplate-1.0')
 
 local addon = LibStub('AceAddon-3.0'):NewAddon(addonName, 'AceEvent-3.0')
 
@@ -83,9 +85,6 @@ end
 local auraProto = NewFrameHeap(addonName.."_Aura", "Frame")
 local unitProto = NewFrameHeap(addonName.."_Unit","Frame")
 local unitFrames = {}
-local NUM_SLOTS = 5
-local unitSlots = {}
-local anchor
 
 auraProto.Debug = addon.Debug
 unitProto.Debug = addon.Debug
@@ -100,17 +99,6 @@ function addon:OnInitialize()
 	self:Debug('Watched auras:', unpack(AURAS))
 	
 	self.db = LibStub('AceDB-3.0'):New('ShowDoTsDB', {profile=DEFAULT_CONFIG})
-
-	anchor = CreateFrame("Frame", addonName..'Anchor', UIParent)
-	anchor:SetWidth((1+#AURAS)*ICON_SIZE)
-	anchor:SetHeight(NUM_SLOTS*ICON_SIZE)
-	anchor:SetPoint("BOTTOMLEFT", 100, 500)
-	anchor:Hide()	
-
-	local libmovable = LibStub('LibMovable-1.0', true)
-	if libmovable then
-		libmovable.RegisterMovable(self, anchor, self.db.profile.anchor)
-	end
 end
 
 function addon:OnEnable()
@@ -120,51 +108,46 @@ function addon:OnEnable()
 	self:RegisterEvent('PLAYER_TARGET_CHANGED')
 	self:RegisterEvent('PLAYER_FOCUS_CHANGED')
 	self:RegisterEvent('COMBAT_LOG_EVENT_UNFILTERED')
+	LibNameplate.RegisterCallback(self, 'LibNameplate_FoundGUID')
+	LibNameplate.RegisterCallback(self, 'LibNameplate_RecycleNameplate')
 end
 
 function addon:OnDisable()
+	LibNameplate.UnregisterAllcallbacks(self)
 	for guid, unitFrame in pairs(unitFrames) do
 		unitFrame:Release()
 	end
 end
 
-local function GetFreeSlot()
-	for slot = 1, NUM_SLOTS do
-		if not unitSlots[slot] then
-			return slot
-		end
+function addon:LibNameplate_FoundGUID(event, nameplate, guid)
+	local unitFrame = unitFrames[guid or ""]
+	if unitFrame then
+		unitFrame:AttachToNameplate(nameplate)
 	end
 end
 
-local currentTargetGUID
+function addon:LibNameplate_RecycleNameplate(event, nameplate)
+	local unitFrame = unitFrames[LibNameplate:GetGUID(nameplate) or ""]
+	if unitFrame then
+		unitFrame:DetachFromNameplate(nameplate)
+	end
+end
+
 local toDelete = {}
 function addon:ScanUnit(event, unit)
 	local guid = UnitGUID(unit)
 	if not guid then return end
-	if unit == 'target' and guid ~= currentTargetGUID then
-		currentTargetGUID = guid
-		for guid, unitFrame in pairs(unitFrames) do
-			unitFrame:UpdateBorder()
-		end
-	end
 	if UnitIsCorpse(unit) or UnitIsDeadOrGhost(unit) or not UnitCanAttack("player", unit) then
 		if unitFrames[guid] then
 			unitFrames[guid]:Release()
-			self:Layout()
 		end
 		return
 	end
 	self:Debug('Scanning', unit, 'on', event)
 	local unitFrame = unitFrames[guid]
-	local freeSlot
 	if unitFrame then
 		for spell, aura in pairs(unitFrame.auras) do
 			toDelete[spell] = aura
-		end
-	else
-		freeSlot = GetFreeSlot()
-		if not freeSlot then
-			return self:Debug('No free slot')
 		end
 	end
 	local auraCount = 0
@@ -175,8 +158,8 @@ function addon:ScanUnit(event, unit)
 			auraCount = auraCount + 1
 			toDelete[name] = nil
 			if not unitFrame then
-				self:Debug('Acquiring unit frame for', guid, 'unit=', unit, 'slot=', freeSlot)
-				unitFrame = unitProto:Acquire(guid, unit, freeSlot)
+				self:Debug('Acquiring unit frame for', guid, 'unit=', unit)
+				unitFrame = unitProto:Acquire(guid, unit)
 				updated = true
 			end
 			local auraFrame = unitFrame.auras[name]
@@ -194,7 +177,6 @@ function addon:ScanUnit(event, unit)
 		if unitFrame then
 			wipe(toDelete)
 			unitFrame:Release()
-			self:Layout()
 		end
 	elseif unitFrame then
 		if next(toDelete) then
@@ -206,15 +188,7 @@ function addon:ScanUnit(event, unit)
 		end
 		if updated then
 			unitFrame:Layout()
-			unitFrame:Show()
-			self:Layout()
 		end
-	end
-end
-
-function addon:Layout()
-	for slot, unitFrame in ipairs(unitSlots) do
-		unitFrame:SetPoint("BOTTOMLEFT", anchor, 0, slot * ICON_SIZE)
 	end
 end
 
@@ -243,98 +217,103 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, sourceGUID, sourceName, 
 	if event == 'UNIT_DIED' then
 		self:Debug(destName, 'died according to combat log')
 		unitFrame:Release()
-		self:Layout()
 		return
-	elseif not strmatch(event, '_AURA_') or band(sourceFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) == 0 then
-		return self:Debug('Ignoring', event, sourceName)
 	end
 	local aura = spellName and unitFrame.auras[spellName]
 	if not aura then return end
 	self:Debug(event, 'source=', sourceName, 'target=', destName, 'spell=', spellName)
+	local updated
 	if event == 'SPELL_AURA_REMOVED' then
 		aura:Release()
-		unitFrame:Layout()
+		updated = true
 	elseif event == 'SPELL_AURA_APPLIED_DOSE' then
-		aura:Update(GetTime(), aura.duration, auraAmount)
+		updated = aura:Update(GetTime(), aura.duration, auraAmount)
 	elseif event == 'SPELL_AURA_REMOVED_DOSE' then
-		aura:Update(aura.start, aura.duration, auraAmount)
+		updated = aura:Update(aura.start, aura.duration, auraAmount)
 	elseif event == 'SPELL_AURA_REFRESH' then
-		aura:Update(GetTime(), aura.duration, aura.count)
+		updated = aura:Update(GetTime(), aura.duration, aura.count)
+	else
+		return
+	end
+	if updated then
+		unitFrame:Layout()
 	end
 end
 
 -- Unit frame methods
 
-local unitBackdrop = {
-	bgFile = [[Interface\Addons\WTFIH\white16x16]],	tile = true, tileSize = 16,
-	edgeFile = [[Interface\Addons\WTFIH\white16x16]], edgeSize = 1,
-	insets = {left = 0, right = 0, top = 0, bottom = 0},
-}
-
 function unitProto:OnInitialize()
 	self.auras = {}
-	
 	self:SetWidth(ICON_SIZE)
 	self:SetHeight(ICON_SIZE)
-	
-	self:SetBackdrop(unitBackdrop)
-	self:SetBackdropColor(0, 0, 0, 1)
-	self:SetBackdropBorderColor(0, 0, 0, 0)
-	
-	local portrait = self:CreateTexture(nil, "OVERLAY")	
-	portrait:SetPoint('TOPLEFT', 1, -1)
-	portrait:SetPoint('BOTTOMRIGHT', -1, 1)
-	self.Portrait = portrait
 end
 
-function unitProto:OnAcquire(guid, unit, slot)
-	SetPortraitTexture(self.Portrait, unit)
-	self.guid = guid
-	self.slot = slot
+function unitProto:OnAcquire(guid, unit)
 	unitFrames[guid] = self
-	unitSlots[slot] = self
-	self:UpdateBorder()
-	self:Show()
+	self.guid = guid
+	self.nameplate = nil
+	local nameplate = LibNameplate:GetNameplateByGUID(guid)
+	if nameplate then
+		self:AttachToNameplate(nameplate)
+	end
+end
+
+function unitProto:AttachToNameplate(nameplate)
+	if nameplate ~= self.nameplate then
+		self.nameplate = nameplate
+		self:SetParent(nameplate)
+		self:SetPoint('LEFT', nameplate, 'RIGHT', 0, -8)
+		self:Show()
+		self:Layout()
+	end
+end
+
+function unitProto:DetachFromNameplate(nameplate)
+	if nameplate == self.nameplate then
+		self.nameplate = nil
+		self:SetParent(nil)
+		self:Hide()
+	end
 end
 
 function unitProto:OnRelease()
-	unitSlots[self.slot] = nil
+	self.nameplate = nil
 	unitFrames[self.guid] = nil
 	for spell, aura in pairs(self.auras) do
 		aura:Release()
 	end
 end
 
-function unitProto:UpdateBorder()
-	if self.guid == UnitGUID('target') then
-		self:SetBackdropBorderColor(1, 1, 1, 1)
-	else
-		self:SetBackdropBorderColor(0, 0, 0, 0)
-	end
+local function SortAuras(a, b)
+	return a:GetTimeLeft() > b:GetTimeLeft()
 end
 
+local tmp = {}
 function unitProto:Layout()
-	for i, name in ipairs(AURAS) do
-		local aura = self.auras[name]
-		if aura then
-			aura:SetPoint("BOTTOMLEFT", self, "BOTTOMRIGHT", ICON_SIZE * (i-1), 0)
+	if self:IsShown() then
+		for _, aura in pairs(self.auras) do
+			tinsert(tmp, aura)
 		end
+		self:SetWidth(ICON_SIZE * #tmp)
+		self:SetHeight(ICON_SIZE)
+		table.sort(tmp, SortAuras)
+		for i, aura in ipairs(tmp) do
+			aura:SetPoint("BOTTOMLEFT", ICON_SIZE * (i-1), 0)
+		end
+		wipe(tmp)
 	end
 end
 
 -- Aura frame methods
 
---local borderBackdrop = {
---	edgeFile = [[Interface\Addons\WTFIH\white16x16]], edgeSize = 1,
---	insets = {left = 0, right = 0, top = 0, bottom = 0},
---}
+local countdownFont, countdownSize = GameFontNormal:GetFont(), math.ceil(ICON_SIZE * 13 / 16)
 
 function auraProto:OnInitialize()
 	self.alpha = 1.0
 	
 	self:SetWidth(ICON_SIZE)
 	self:SetHeight(ICON_SIZE)
-	
+
 	local texture = self:CreateTexture(nil, "OVERLAY")
 	texture:SetPoint("TOPLEFT", self, "TOPLEFT")
 	texture:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT")
@@ -342,19 +321,24 @@ function auraProto:OnInitialize()
 	texture:SetTexture(1,1,1,0)
 	self.Texture = texture
 
-	local cooldown = CreateFrame("Cooldown", nil, self, "CooldownFrameTemplate")
-	cooldown:SetAllPoints(texture)
-	cooldown:SetDrawEdge(true)
-	cooldown:SetReverse(true)
-	self.Cooldown = cooldown
+	local countdown = self:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+	countdown:SetPoint("CENTER")
+	countdown:SetJustifyH("CENTER")
+	countdown:SetJustifyV("MIDDLE")
+	countdown:SetFont(countdownFont, countdownSize, "OUTLINE")
+	countdown:SetShadowColor(0, 0, 0, 0.66)
+	countdown:SetTextColor(1, 1, 0, 1)
+	countdown:SetAlpha(1)
+	self.Countdown = countdown
 
 	local count = self:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 	count:SetAllPoints(texture)
 	count:SetJustifyH("RIGHT")
 	count:SetJustifyV("BOTTOM")
-	count:SetFont(GameFontNormal:GetFont(), 13, "OUTLINE")
-	count:SetShadowColor(0, 0, 0, 0)
+	count:SetFont(GameFontNormal:GetFont(), math.ceil(ICON_SIZE * 10 / 16), "OUTLINE")
+	count:SetShadowColor(0, 0, 0, 0.66)
 	count:SetTextColor(1, 1, 1, 1)
+	count:SetAlpha(1)
 	self.Count = count
 end
 
@@ -381,19 +365,40 @@ function auraProto:Update(start, duration, count)
 	end
 end
 
+function auraProto:GetTimeLeft()
+	return self.expireTime and (self.expireTime - GetTime()) or 0
+end
+
+local ceil, max, floor = math.ceil, math.max, math.floor
 function auraProto:OnUpdate(elapsed)
 	local now = GetTime()
 	local timeLeft = self.expireTime - now
 	if timeLeft <=0 then
-		self:Release()
-	elseif timeLeft < self.flashTime then
-		local alpha = now % 1
-		if alpha < 0.5 then
-			alpha = alpha * 2
-		else
-			alpha = (1 - alpha) * 2
+		return self:Release()
+	end
+	local countdown = self.Countdown
+	if timeLeft < self.flashTime then
+		local txt = tostring(ceil(timeLeft))
+		if txt ~= countdown:GetText() then
+			countdown:SetText(txt)
+			countdown:SetFont(countdownFont, countdownSize, "OUTLINE")
+			countdown:SetTextColor(1, timeLeft / self.flashTime, 0)
+			countdown:Show()
+			local scale = ICON_SIZE / max(countdown:GetStringWidth(), countdown:GetStringHeight())
+			if scale < 1.0 then
+				countdown:SetFont(countdownFont, floor(countdownSize * scale), "OUTLINE")
+			end
 		end
-		self:SetAlpha(self.alpha * alpha)
+		local alpha = timeLeft % 1
+		if alpha < 0.5 then
+			alpha = 1 - alpha * 2
+		else
+			alpha = alpha * 2 - 1
+		end
+		self:SetAlpha(self.alpha * (0.2 + 0.8 * alpha))
+	elseif countdown:IsShown() then
+		countdown:SetText("")
+		countdown:Hide()
 	end
 end
 
@@ -421,12 +426,12 @@ function auraProto:SetDuration(start, duration)
 	start, duration = tonumber(start), tonumber(duration)
 	if start and duration then
 		self.expireTime = start + duration
-		self.flashTime = math.min(duration / 3, 3)
+		self.flashTime = math.max(math.min(duration / 3, 6), 3)
+		self.Countdown:Show()
 		self:SetScript('OnUpdate', self.OnUpdate)
-		self.Cooldown:SetCooldown(start, duration)
-		self.Cooldown:Show()
 	else
+		self.expireTime, self.flashTime = nil, nil
 		self:SetScript('OnUpdate', nil)
-		self.Cooldown:Hide()
+		self.Countdown:Hide()
 	end
 end
