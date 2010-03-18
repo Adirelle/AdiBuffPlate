@@ -80,6 +80,7 @@ function addon:OnEnable()
 	self:RegisterEvent('UNIT_TARGET')
 	self:RegisterEvent('PLAYER_TARGET_CHANGED')
 	self:RegisterEvent('PLAYER_FOCUS_CHANGED')
+	self:RegisterEvent('UPDATE_MOUSEOVER_UNIT')
 	self:RegisterEvent('COMBAT_LOG_EVENT_UNFILTERED')
 	LibNameplate.RegisterCallback(self, 'LibNameplate_FoundGUID')
 	LibNameplate.RegisterCallback(self, 'LibNameplate_RecycleNameplate')
@@ -186,11 +187,24 @@ function addon:PLAYER_FOCUS_CHANGED(event)
 	return self:ScanUnit(event, "focus")
 end
 
+local lastMouseoverScan = setmetatable({}, {__mode = 'kv'})
+function addon:UPDATE_MOUSEOVER_UNIT(event)
+	if UnitIsUnit('mouseover', 'target') or UnitIsUnit('mouseover', 'focus') or UnitInParty('mouseover') or UnitInRaid('mouseover') then
+		return
+	end
+	local guid = UnitGUID('mouseover')
+	if guid and GetTime() - (lastMouseoverScan[guid] or 0) > 0.5 then
+		lastMouseoverScan[guid] = GetTime()
+		return self:ScanUnit(event, "mouseover")
+	end
+end
+
 local strmatch, band = string.match, bit.band
 function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, sourceGUID, sourceName, sourceFlags, destGUID, destName, destFlags, spellId, spellName, spellSchool, auraType, auraAmount)
 	local unitFrame = destGUID and unitFrames[destGUID]
 	if not unitFrame then return end
 	if event == 'UNIT_DIED' then
+		lastMouseoverScan[destGUID] = nil
 		self:Debug(destName, 'died according to combat log')
 		unitFrame:Release()
 		return
