@@ -99,7 +99,7 @@ function addon:OnInitialize()
 	end
 	self:Debug('Watched auras:', unpack(AURAS))
 	
-	self.db = LibStub('AceDB-3.0'):NewDatabase('ShowDoTsDB', {profile=DEFAULT_CONFIG})
+	self.db = LibStub('AceDB-3.0'):New('ShowDoTsDB', {profile=DEFAULT_CONFIG})
 
 	anchor = CreateFrame("Frame", addonName..'Anchor', UIParent)
 	anchor:SetWidth((1+#AURAS)*ICON_SIZE)
