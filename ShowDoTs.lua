@@ -93,14 +93,15 @@ function addon:OnDisable()
 end
 
 function addon:LibNameplate_FoundGUID(event, nameplate, guid)
-	local unitFrame = unitFrames[guid or ""]
+	local unitFrame = guid and unitFrames[guid]
 	if unitFrame then
 		unitFrame:AttachToNameplate(nameplate)
 	end
 end
 
 function addon:LibNameplate_RecycleNameplate(event, nameplate)
-	local unitFrame = unitFrames[LibNameplate:GetGUID(nameplate) or ""]
+	local guid = LibNameplate:GetGUID(nameplate)
+	local unitFrame = guid and unitFrames[guid]
 	if unitFrame then
 		unitFrame:DetachFromNameplate(nameplate)
 	end
@@ -129,7 +130,7 @@ function addon:ScanUnit(event, unit)
 		local name, _, icon, count, _, duration, expireTime, caster, _, _, spellId = UnitDebuff(unit, i)
 		if not name then break end
 		duration, expireTime = tonumber(duration) or 0, tonumber(expireTime) or 0
-		if (caster == "player" or caster == "pet" or caster == "vehicle") and duration > 5 and duration <= 30 then
+		if (caster == "player" or caster == "pet" or caster == "vehicle") and (caster == "pet" or duration > 5) and duration <= 30 then
 			auraCount = auraCount + 1
 			toDelete[name] = nil
 			if not unitFrame then 
@@ -227,14 +228,19 @@ function unitProto:OnAcquire(guid, unit)
 	unitFrames[guid] = self
 	self.guid = guid
 	self.nameplate = nil
-	local nameplate = LibNameplate:GetNameplateByGUID(guid)
-	if nameplate then
-		self:AttachToNameplate(nameplate)
+	self:AttachToNameplate(LibNameplate:GetNameplateByGUID(guid))
+end
+
+function unitProto:OnRelease()
+	self:DetachFromNameplate(self.nameplate)
+	unitFrames[self.guid] = nil
+	for spell, aura in pairs(self.auras) do
+		aura:Release()
 	end
 end
 
 function unitProto:AttachToNameplate(nameplate)
-	if nameplate ~= self.nameplate then
+	if nameplate and nameplate ~= self.nameplate then
 		self.nameplate = nameplate
 		self:SetParent(nameplate)
 		self:SetPoint('BOTTOMLEFT', nameplate, 'BOTTOMRIGHT')
@@ -244,18 +250,11 @@ function unitProto:AttachToNameplate(nameplate)
 end
 
 function unitProto:DetachFromNameplate(nameplate)
-	if nameplate == self.nameplate then
+	if self.nameplate and nameplate == self.nameplate then
 		self.nameplate = nil
 		self:SetParent(nil)
+		self:ClearAllPoints()
 		self:Hide()
-	end
-end
-
-function unitProto:OnRelease()
-	self.nameplate = nil
-	unitFrames[self.guid] = nil
-	for spell, aura in pairs(self.auras) do
-		aura:Release()
 	end
 end
 
