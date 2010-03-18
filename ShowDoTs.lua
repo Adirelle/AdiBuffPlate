@@ -7,25 +7,6 @@ All rights reserved.
 local addonName, ns = ...
 local ICON_SIZE = 16
 
-local AURAS = {
-	WARLOCK = {
-		(GetSpellInfo(172)), -- Corruption
-		(GetSpellInfo(48181)), -- Haunt
-		(GetSpellInfo(30108)), -- Unstable Afflication
-		(GetSpellInfo(980)), -- Curse of Agony
-		(GetSpellInfo(27243)), -- Seed of Corruption
-		(GetSpellInfo(348)), -- Immolate
-		(GetSpellInfo(5782)), -- Fear
-		(GetSpellInfo(49892)), -- Death Coil
-		(GetSpellInfo(5484)), -- Howl of Terror
-	},
-	DRUID = {
-		(GetSpellInfo(8921)), -- Moonfire
-		(GetSpellInfo(24974)), -- Insect Swarm
-		(GetSpellInfo(33745)), -- Lacerate
-	},
-}
-
 local DEFAULT_CONFIG = {
 	anchor = {}
 }
@@ -90,14 +71,6 @@ auraProto.Debug = addon.Debug
 unitProto.Debug = addon.Debug
 
 function addon:OnInitialize()
-	local _, class = UnitClass('player')
-	AURAS = AURAS[class]
-	if not AURAS then
-		self:Debug('Not aura to watch, disabling')
-		return self:Disable()
-	end
-	self:Debug('Watched auras:', unpack(AURAS))
-	
 	self.db = LibStub('AceDB-3.0'):New('ShowDoTsDB', {profile=DEFAULT_CONFIG})
 end
 
@@ -152,12 +125,14 @@ function addon:ScanUnit(event, unit)
 	end
 	local auraCount = 0
 	local updated = false
-	for i, name in ipairs(AURAS) do
-		local found, _, icon, count, _, duration, expireTime, caster = UnitDebuff(unit, name)
-		if found and caster == "player" and (tonumber(duration) or 0) > 0 then
+	for i = 1, 1000 do
+		local name, _, icon, count, _, duration, expireTime, caster, _, _, spellId = UnitDebuff(unit, i)
+		if not name then break end
+		duration, expireTime = tonumber(duration) or 0, tonumber(expireTime) or 0
+		if (caster == "player" or caster == "pet" or caster == "vehicle") and duration > 5 and duration <= 30 then
 			auraCount = auraCount + 1
 			toDelete[name] = nil
-			if not unitFrame then
+			if not unitFrame then 
 				self:Debug('Acquiring unit frame for', guid, 'unit=', unit)
 				unitFrame = unitProto:Acquire(guid, unit)
 				updated = true
@@ -262,7 +237,7 @@ function unitProto:AttachToNameplate(nameplate)
 	if nameplate ~= self.nameplate then
 		self.nameplate = nameplate
 		self:SetParent(nameplate)
-		self:SetPoint('LEFT', nameplate, 'RIGHT', 0, -8)
+		self:SetPoint('BOTTOMLEFT', nameplate, 'BOTTOMRIGHT')
 		self:Show()
 		self:Layout()
 	end
