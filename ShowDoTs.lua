@@ -131,7 +131,7 @@ function addon:ScanUnit(event, unit)
 		local name, _, icon, count, _, duration, expireTime, caster, _, _, spellId = UnitDebuff(unit, i)
 		if not name then break end
 		duration, expireTime = tonumber(duration) or 0, tonumber(expireTime) or 0
-		if (caster == "player" or caster == "pet" or caster == "vehicle") and (caster == "pet" or duration > 5) and duration <= 30 then
+		if (caster == "player" or caster == "pet" or caster == "vehicle") and (caster == "pet" or duration > 5) and duration <= 300 then
 			auraCount = auraCount + 1
 			toDelete[name] = nil
 			if not unitFrame then 
