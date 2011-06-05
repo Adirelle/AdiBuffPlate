@@ -44,6 +44,21 @@ local DEFAULT_CONFIG = {
 
 local LibNameplate = LibStub('LibNameplate-1.0')
 
+local SPELLS = {}
+for id, cat in pairs(LibStub('DRData-1.0'):GetSpells()) do
+	SPELLS[id] = cat
+end
+local SCALES = {
+	banish = 3.0,
+	cyclone = 3.0,
+	mc = 3.0,
+	disorient = 2,
+	scatters = 2,
+	dragons = 2,
+	ctrlstun = 1.5,
+	rndstun = 1.5,
+}
+
 local addon = LibStub('AceAddon-3.0'):NewAddon(addonName, 'AceEvent-3.0')
 
 local function NewFrameHeap(namePrefix, frameType, parent, template)
@@ -139,6 +154,23 @@ function addon:LibNameplate_RecycleNameplate(event, nameplate)
 	end
 end
 
+function addon:AcceptAura(spellId, isMine, duration)
+	local accepted, scale
+	local category = SPELLS[spellId]
+	if (isMine and duration <= 300) or category then
+		accepted = true
+		if category then
+			scale = SCALES[category] or 1.25
+		else
+			scale = 1.0
+		end
+	else
+		accepted = false
+	end
+	self:Debug('AcceptAura', spellId, isMine, duration, '|', category, '=>', accepted, scale)
+	return accepted, scale
+end
+
 local toDelete = {}
 function addon:ScanUnit(event, unit)
 	local guid = UnitGUID(unit)
@@ -161,8 +193,12 @@ function addon:ScanUnit(event, unit)
 	for i = 1, 1000 do
 		local name, _, icon, count, _, duration, expireTime, caster, _, _, spellId = UnitDebuff(unit, i)
 		if not name then break end
-		duration, expireTime = tonumber(duration) or 0, tonumber(expireTime) or 0
-		if (caster == "player" or caster == "pet" or caster == "vehicle") and (caster == "pet" or duration > 5) and duration <= 300 then
+		if not duration or duration == 0 then
+			duration, expireTime = huge, huge
+		end
+		local isMine = (caster == "player" or caster == "pet" or caster == "vehicle")
+		local accepted, scale = self:AcceptAura(spellId, isMine, duration)
+		if accepted then
 			auraCount = auraCount + 1
 			toDelete[name] = nil
 			if not unitFrame then
@@ -176,7 +212,9 @@ function addon:ScanUnit(event, unit)
 				auraFrame = auraProto:Acquire(unitFrame, name, icon)
 			end
 			self:Debug(unit, name, duration, expireTime, count)
-			updated = auraFrame:Update(expireTime-duration, duration, count) or updated
+			if auraFrame:Update(expireTime-duration, duration, count, scale) then
+				updated = true
+			end
 			auraFrame:Show()
 		end
 	end
@@ -241,16 +279,22 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceNam
 	local unitFrame = destGUID and unitFrames[destGUID]
 
 	if event == 'SPELL_AURA_APPLIED' then
-		if sourceGUID and spellName and band(sourceFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) ~= 0 then
-			if not unitFrame then
-				unitFrame = unitProto:Acquire(destGUID)
-			end
-			local aura = unitFrame.auras[spellName]
-			if not aura then
-				local _, _, icon = GetSpellInfo(spellId)
-				aura = auraProto:Acquire(unitFrame, spellName, icon)
-				aura:Update(GetTime(), nil, auraAmount)
-				unitFrame:Layout()
+		if auraType == 'DEBUFF' then
+			local isMine = band(sourceFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) ~= 0
+			local accepted, scale = self:AcceptAura(spellId, isMine, huge)
+			if accepted then
+				if not unitFrame then
+					unitFrame = unitProto:Acquire(destGUID)
+				end
+				local aura = unitFrame.auras[spellName]
+				if not aura then
+					local _, _, icon = GetSpellInfo(spellId)
+					aura = auraProto:Acquire(unitFrame, spellName, icon)
+					aura:Show()
+				end
+				if aura:Update(GetTime(), nil, auraAmount, scale) then
+					unitFrame:Layout()
+				end
 			end
 		end
 		return
@@ -313,7 +357,7 @@ function unitProto:AttachToNameplate(nameplate)
 	if nameplate and nameplate ~= self.nameplate then
 		self.nameplate = nameplate
 		self:SetParent(nameplate)
-		self:SetPoint('BOTTOMLEFT', nameplate, 'BOTTOMRIGHT')
+		self:SetPoint('TOP', nameplate, 'BOTTOM', 0, 0)
 		self:Show()
 		self:Layout()
 	end
@@ -329,7 +373,11 @@ function unitProto:DetachFromNameplate(nameplate)
 end
 
 local function SortAuras(a, b)
-	return a:GetTimeLeft() > b:GetTimeLeft()
+	if a.scale == b.scale then
+		return a:GetTimeLeft() > b:GetTimeLeft()
+	else
+		return b.scale > a.scale
+	end
 end
 
 local tmp = {}
@@ -338,12 +386,14 @@ function unitProto:Layout()
 		for _, aura in pairs(self.auras) do
 			tinsert(tmp, aura)
 		end
-		self:SetWidth(ICON_SIZE * #tmp)
-		self:SetHeight(ICON_SIZE)
+		local width, height = 0, 0
 		tsort(tmp, SortAuras)
 		for i, aura in ipairs(tmp) do
-			aura:SetPoint("BOTTOMLEFT", ICON_SIZE * (i-1), 0)
+			aura:SetPoint("TOPLEFT", width, 0)
+			local w, h = aura:GetSize()
+			width, height = width + w, max(height, h)
 		end
+		self:SetSize(width, height)
 		wipe(tmp)
 	end
 end
@@ -355,9 +405,9 @@ local countdownFont, countdownSize = GameFontNormal:GetFont(), ceil(ICON_SIZE * 
 
 function auraProto:OnInitialize()
 	self.alpha = 1.0
+	self.scale = 1.0
 
-	self:SetWidth(ICON_SIZE)
-	self:SetHeight(ICON_SIZE)
+	self:SetSize(ICON_SIZE, ICON_SIZE)
 
 	local texture = self:CreateTexture(nil, "OVERLAY")
 	texture:SetPoint("TOPLEFT", self, "TOPLEFT")
@@ -401,11 +451,12 @@ function auraProto:OnRelease()
 	self.unitFrame = nil
 end
 
-function auraProto:Update(start, duration, count)
-	if self.start ~= start or self.duration ~= duration or self.count ~= count then
+function auraProto:Update(start, duration, count, scale)
+	if self.start ~= start or self.duration ~= duration or self.count ~= count or self.scale ~= scale then
 		self.start, self.duration, self.count = start, duration, count
 		self:SetDuration(start, duration)
 		self:SetCount(count)
+		self:SetScale(scale)
 		return true
 	end
 end
@@ -421,7 +472,7 @@ function auraProto:OnUpdate(elapsed)
 		return self:Release()
 	end
 	local countdown = self.Countdown
-	if timeLeft < self.flashTime then
+	if timeLeft < self.flashTime or self.scale > 1.0 then
 		local txt = tostring(ceil(timeLeft))
 		if txt ~= countdown:GetText() then
 			countdown:SetText(txt)
@@ -433,13 +484,15 @@ function auraProto:OnUpdate(elapsed)
 				countdown:SetFont(countdownFont, floor(countdownSize * scale), "OUTLINE")
 			end
 		end
-		local alpha = timeLeft % 1
-		if alpha < 0.5 then
-			alpha = 1 - alpha * 2
-		else
-			alpha = alpha * 2 - 1
+		if timeLeft < self.flashTime then
+			local alpha = timeLeft % 1
+			if alpha < 0.5 then
+				alpha = 1 - alpha * 2
+			else
+				alpha = alpha * 2 - 1
+			end
+			self:SetAlpha(self.alpha * (0.2 + 0.8 * alpha))
 		end
-		self:SetAlpha(self.alpha * (0.2 + 0.8 * alpha))
 	elseif countdown:IsShown() then
 		countdown:SetText("")
 		countdown:Hide()
@@ -465,6 +518,14 @@ function auraProto:SetCount(count)
 	end
 end
 
+function auraProto:SetScale(scale)
+	scale = tonumber(scale) or 1
+	if scale ~= self.scale then
+		self.scale = scale
+		self:SetSize(ICON_SIZE * scale, ICON_SIZE * scale)
+	end
+end
+
 function auraProto:SetDuration(start, duration)
 	self:SetAlpha(self.alpha)
 	start, duration = tonumber(start), tonumber(duration)
@@ -479,3 +540,49 @@ function auraProto:SetDuration(start, duration)
 		self.Countdown:Hide()
 	end
 end
+
+--------------------------------------------------------------------------------
+-- DRData does not know about snares, but we want them
+--------------------------------------------------------------------------------
+
+for i, id in pairs{
+	 1604, -- Dazed
+	45524, -- Chains of Ice
+	50434, -- Chilblains
+	58617, -- Glyph of Heart Strike
+	68766, -- Desecration
+	50259, -- Dazed (feral charge effect)
+	58180, -- Infected Wounds
+	61391, -- Typhoon
+	31589, -- Slow
+	44614, -- Frostfire Bolt
+	 2974, -- Wing Clip
+	 5116, -- Concussive Shot
+	13810, -- Ice Trap
+	35101, -- Concussive Barrage
+	35346, -- Time Warp (Warp Stalker)
+	50433, -- Ankle Crack (Crocolisk)
+	54644, -- Frost Breath (Chimaera)
+	61394, -- Frozen Wake (glyph)
+	  116, -- Frostbolt
+	  120, -- Cone of Cold
+	 6136, -- Chilled
+	 7321, -- Chilled (bis)
+	11113, -- Blast Wave
+	 3409, -- Crippling Poison
+	26679, -- Deadly Throw
+	31126, -- Blade Twisting
+	51693, -- Waylay
+	51585, -- Blade Twisting
+	 3600, -- Earthbind
+	 8034, -- Frostbrand Attack
+	 8056, -- Frost Shock
+	 8178, -- Grounding Totem Effect
+	18118, -- Aftermath
+	18223, -- Curse of Exhaustion
+	 1715, -- Piercing Howl
+	12323  -- Hamstring
+} do
+	SPELLS[id] = "snare"
+end
+

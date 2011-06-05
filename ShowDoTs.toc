@@ -6,7 +6,7 @@
 ## Version: @project-version@
 #-# LoadManagers: AddonLoader
 #-# X-LoadOn-Always: delayed
-## OptionalDeps: Ace3, LibNameplate-1.0, AdiDebug
+## OptionalDeps: Ace3, LibNameplate-1.0, DRData-1.0, AdiDebug
 ## SavedVariables: ShowDoTsDB
 
 ShowDoTs.lua
