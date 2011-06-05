@@ -48,16 +48,6 @@ local SPELLS = {}
 for id, cat in pairs(LibStub('DRData-1.0'):GetSpells()) do
 	SPELLS[id] = cat
 end
-local SCALES = {
-	banish = 3.0,
-	cyclone = 3.0,
-	mc = 3.0,
-	disorient = 2,
-	scatters = 2,
-	dragons = 2,
-	ctrlstun = 1.5,
-	rndstun = 1.5,
-}
 
 local addon = LibStub('AceAddon-3.0'):NewAddon(addonName, 'AceEvent-3.0')
 
@@ -155,20 +145,13 @@ function addon:LibNameplate_RecycleNameplate(event, nameplate)
 end
 
 function addon:AcceptAura(spellId, isMine, duration)
-	local accepted, scale
-	local category = SPELLS[spellId]
-	if (isMine and duration <= 300) or category then
-		accepted = true
-		if category then
-			scale = SCALES[category] or 1.25
-		else
-			scale = 1.0
-		end
+	if SPELLS[spellId] then
+		return true, 2.5
+	elseif isMine and duration > 5 and duration <= 300 then
+		return true, 1
 	else
-		accepted = false
+		return false
 	end
-	self:Debug('AcceptAura', spellId, isMine, duration, '|', category, '=>', accepted, scale)
-	return accepted, scale
 end
 
 local toDelete = {}
