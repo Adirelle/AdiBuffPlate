@@ -166,7 +166,7 @@ function addon:ScanUnit(event, unit)
 			toDelete[name] = nil
 			if not unitFrame then
 				self:Debug('Acquiring unit frame for', guid, 'unit=', unit)
-				unitFrame = unitProto:Acquire(guid, unit)
+				unitFrame = unitProto:Acquire(guid)
 				updated = true
 			end
 			local auraFrame = unitFrame.auras[name]
@@ -267,7 +267,7 @@ function unitProto:OnInitialize()
 	self:SetHeight(ICON_SIZE)
 end
 
-function unitProto:OnAcquire(guid, unit)
+function unitProto:OnAcquire(guid)
 	unitFrames[guid] = self
 	self.guid = guid
 	self.nameplate = nil
