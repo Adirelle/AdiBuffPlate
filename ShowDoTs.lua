@@ -200,7 +200,7 @@ function addon:UPDATE_MOUSEOVER_UNIT(event)
 end
 
 local strmatch, band = string.match, bit.band
-function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, sourceGUID, sourceName, sourceFlags, destGUID, destName, destFlags, spellId, spellName, spellSchool, auraType, auraAmount)
+function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceName, sourceFlags, destGUID, destName, destFlags, spellId, spellName, spellSchool, auraType, auraAmount)
 	local unitFrame = destGUID and unitFrames[destGUID]
 	if not unitFrame then return end
 	if event == 'UNIT_DIED' then
