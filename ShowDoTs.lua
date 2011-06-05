@@ -230,32 +230,52 @@ function addon:UPDATE_MOUSEOVER_UNIT(event)
 end
 
 function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceName, sourceFlags, destGUID, destName, destFlags, spellId, spellName, spellSchool, auraType, auraAmount)
+
 	local unitFrame = destGUID and unitFrames[destGUID]
+
+	if event == 'SPELL_AURA_APPLIED' then
+		if sourceGUID and spellName and band(sourceFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) ~= 0 then
+			if not unitFrame then
+				unitFrame = unitProto:Acquire(destGUID)
+			end
+			local aura = unitFrame.auras[spellName]
+			if not aura then
+				local _, _, icon = GetSpellInfo(spellId)
+				aura = auraProto:Acquire(unitFrame, spellName, icon)
+				aura:Update(GetTime(), nil, auraAmount)
+				unitFrame:Layout()
+			end
+		end
+		return
+	end
+
 	if not unitFrame then return end
+
 	if event == 'UNIT_DIED' then
 		lastMouseoverScan[destGUID] = nil
 		self:Debug(destName, 'died according to combat log')
 		unitFrame:Release()
 		return
 	end
+
 	local aura = spellName and unitFrame.auras[spellName]
 	if not aura then return end
 	self:Debug(event, 'source=', sourceName, 'target=', destName, 'spell=', spellName)
-	local updated
 	if event == 'SPELL_AURA_REMOVED' then
 		aura:Release()
-		updated = true
-	elseif event == 'SPELL_AURA_APPLIED_DOSE' then
-		updated = aura:Update(GetTime(), aura.duration, auraAmount)
-	elseif event == 'SPELL_AURA_REMOVED_DOSE' then
-		updated = aura:Update(aura.start, aura.duration, auraAmount)
-	elseif event == 'SPELL_AURA_REFRESH' then
-		updated = aura:Update(GetTime(), aura.duration, aura.count)
-	else
-		return
-	end
-	if updated then
 		unitFrame:Layout()
+	elseif event == 'SPELL_AURA_APPLIED_DOSE' then
+		if aura:Update(GetTime(), aura.duration, auraAmount) then
+			unitFrame:Layout()
+		end
+	elseif event == 'SPELL_AURA_REMOVED_DOSE' then
+		if aura:Update(aura.start, aura.duration, auraAmount) then
+			unitFrame:Layout()
+		end
+	elseif event == 'SPELL_AURA_REFRESH' then
+		if aura:Update(GetTime(), aura.duration, aura.count) then
+			unitFrame:Layout()
+		end
 	end
 end
 
