@@ -112,6 +112,7 @@ function addon:OnEnable()
 	self:RegisterEvent('PLAYER_FOCUS_CHANGED')
 	self:RegisterEvent('UPDATE_MOUSEOVER_UNIT')
 	self:RegisterEvent('COMBAT_LOG_EVENT_UNFILTERED')
+	self:RegisterEvent('PLAYER_DEAD')
 	LibNameplate.RegisterCallback(self, 'LibNameplate_FoundGUID')
 	LibNameplate.RegisterCallback(self, 'LibNameplate_RecycleNameplate')
 end
@@ -215,6 +216,12 @@ end
 
 function addon:PLAYER_FOCUS_CHANGED(event)
 	return self:ScanUnit(event, "focus")
+end
+
+function addon:PLAYER_DEAD()
+	for guid, unitFrame in pairs(unitFrames) do
+		unitFrame:Release()
+	end
 end
 
 local lastMouseoverScan = setmetatable({}, {__mode = 'kv'})
