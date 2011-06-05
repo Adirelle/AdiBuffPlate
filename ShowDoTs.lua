@@ -54,14 +54,13 @@ local function NewFrameHeap(namePrefix, frameType, parent, template)
 end
 
 -- Debug output
-if tekDebug then
-	local debugFrame = tekDebug:GetFrame(addonName)
-	function addon:Debug(...)
-		debugFrame:AddMessage('|cffff8800['..tostring(self)..']|r '..strjoin(" ", tostringall(...)):gsub("= ", "="))
-	end
+--@debug@
+if AdiDebug then
+	AdiDebug:Embed(addon, addonName)
 else
 	function addon.Debug() end
 end
+--@end-debug@
 
 local auraProto = NewFrameHeap(addonName.."_Aura", "Frame")
 local unitProto = NewFrameHeap(addonName.."_Unit","Frame")
