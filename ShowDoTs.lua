@@ -4,6 +4,37 @@ Copyright 2010 Adirelle
 All rights reserved.
 --]]
 
+--<GLOBALS
+local _G = _G
+local band = _G.bit.band
+local ceil = _G.ceil
+local COMBATLOG_OBJECT_AFFILIATION_MINE = _G.COMBATLOG_OBJECT_AFFILIATION_MINE
+local CreateFrame = _G.CreateFrame
+local floor = _G.floor
+local GetSpellInfo = _G.GetSpellInfo
+local GetTime = _G.GetTime
+local huge = _G.math.huge
+local ipairs = _G.ipairs
+local max = _G.max
+local min = _G.min
+local next = _G.next
+local pairs = _G.pairs
+local setmetatable = _G.setmetatable
+local tinsert = _G.tinsert
+local tonumber = _G.tonumber
+local tostring = _G.tostring
+local tsort = _G.table.sort
+local UnitCanAttack = _G.UnitCanAttack
+local UnitDebuff = _G.UnitDebuff
+local UnitGUID = _G.UnitGUID
+local UnitInParty = _G.UnitInParty
+local UnitInRaid = _G.UnitInRaid
+local UnitIsCorpse = _G.UnitIsCorpse
+local UnitIsDeadOrGhost = _G.UnitIsDeadOrGhost
+local UnitIsUnit = _G.UnitIsUnit
+local wipe = _G.wipe
+--GLOBALS>
+
 local addonName, ns = ...
 local ICON_SIZE = 16
 
@@ -198,7 +229,6 @@ function addon:UPDATE_MOUSEOVER_UNIT(event)
 	end
 end
 
-local strmatch, band = string.match, bit.band
 function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceName, sourceFlags, destGUID, destName, destFlags, spellId, spellName, spellSchool, auraType, auraAmount)
 	local unitFrame = destGUID and unitFrames[destGUID]
 	if not unitFrame then return end
@@ -283,7 +313,7 @@ function unitProto:Layout()
 		end
 		self:SetWidth(ICON_SIZE * #tmp)
 		self:SetHeight(ICON_SIZE)
-		table.sort(tmp, SortAuras)
+		tsort(tmp, SortAuras)
 		for i, aura in ipairs(tmp) do
 			aura:SetPoint("BOTTOMLEFT", ICON_SIZE * (i-1), 0)
 		end
@@ -293,7 +323,8 @@ end
 
 -- Aura frame methods
 
-local countdownFont, countdownSize = GameFontNormal:GetFont(), math.ceil(ICON_SIZE * 13 / 16)
+-- GLOBALS: GameFontNormal
+local countdownFont, countdownSize = GameFontNormal:GetFont(), ceil(ICON_SIZE * 13 / 16)
 
 function auraProto:OnInitialize()
 	self.alpha = 1.0
@@ -322,7 +353,7 @@ function auraProto:OnInitialize()
 	count:SetAllPoints(texture)
 	count:SetJustifyH("RIGHT")
 	count:SetJustifyV("BOTTOM")
-	count:SetFont(GameFontNormal:GetFont(), math.ceil(ICON_SIZE * 10 / 16), "OUTLINE")
+	count:SetFont(GameFontNormal:GetFont(), ceil(ICON_SIZE * 10 / 16), "OUTLINE")
 	count:SetShadowColor(0, 0, 0, 0.66)
 	count:SetTextColor(1, 1, 1, 1)
 	count:SetAlpha(1)
@@ -353,10 +384,9 @@ function auraProto:Update(start, duration, count)
 end
 
 function auraProto:GetTimeLeft()
-	return self.expireTime and (self.expireTime - GetTime()) or 0
+	return self.expireTime and (self.expireTime - GetTime()) or huge
 end
 
-local ceil, max, floor = math.ceil, math.max, math.floor
 function auraProto:OnUpdate(elapsed)
 	local now = GetTime()
 	local timeLeft = self.expireTime - now
@@ -413,7 +443,7 @@ function auraProto:SetDuration(start, duration)
 	start, duration = tonumber(start), tonumber(duration)
 	if start and duration then
 		self.expireTime = start + duration
-		self.flashTime = math.max(math.min(duration / 3, 6), 3)
+		self.flashTime = max(min(duration / 3, 6), 3)
 		self.Countdown:Show()
 		self:SetScript('OnUpdate', self.OnUpdate)
 	else
