@@ -1,5 +1,5 @@
 --[[
-ShowDoTs -- Display Damage over Time debuffs
+AdiBuffPlate -- Display Damage over Time debuffs
 Copyright 2010 Adirelle
 All rights reserved.
 --]]
@@ -116,7 +116,7 @@ auraProto.Debug = addon.Debug
 unitProto.Debug = addon.Debug
 
 function addon:OnInitialize()
-	self.db = LibStub('AceDB-3.0'):New('ShowDoTsDB', {profile=DEFAULT_CONFIG})
+	self.db = LibStub('AceDB-3.0'):New('AdiBuffPlateDB', {profile=DEFAULT_CONFIG})
 end
 
 function addon:OnEnable()

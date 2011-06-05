@@ -1,13 +1,13 @@
 ## Interface: 40100
 
-## Title: ShowDoTs
+## Title: AdiBuffPlate
 ## Notes: Show Damage over Time debuffs.
 ## Author: Adirelle
 ## Version: @project-version@
 #-# LoadManagers: AddonLoader
 #-# X-LoadOn-Always: delayed
 ## OptionalDeps: Ace3, LibNameplate-1.0, DRData-1.0, AdiDebug
-## SavedVariables: ShowDoTsDB
+## SavedVariables: AdiBuffPlateDB
 
-ShowDoTs.lua
+AdiBuffPlate.lua
 
