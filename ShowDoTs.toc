@@ -3,7 +3,7 @@
 ## Title: ShowDoTs
 ## Notes: Show Damage over Time debuffs.
 ## Author: Adirelle
-## Version: @project-version@ 
+## Version: @project-version@
 #-# LoadManagers: AddonLoader
 #-# X-LoadOn-Always: delayed
 ## OptionalDeps: Ace3, LibNameplate-1.0, tekDebug

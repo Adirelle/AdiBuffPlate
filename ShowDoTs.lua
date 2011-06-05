@@ -134,7 +134,7 @@ function addon:ScanUnit(event, unit)
 		if (caster == "player" or caster == "pet" or caster == "vehicle") and (caster == "pet" or duration > 5) and duration <= 300 then
 			auraCount = auraCount + 1
 			toDelete[name] = nil
-			if not unitFrame then 
+			if not unitFrame then
 				self:Debug('Acquiring unit frame for', guid, 'unit=', unit)
 				unitFrame = unitProto:Acquire(guid, unit)
 				updated = true
@@ -174,7 +174,7 @@ function addon:UNIT_TARGET(event, unit)
 		return self:ScanUnit(event, (unit.."target"):gsub("(%d+)(target)$", "%2%1"))
 	end
 end
-	
+
 function addon:UNIT_AURA(event, unit)
 	return self:ScanUnit(event, unit)
 end
@@ -298,7 +298,7 @@ local countdownFont, countdownSize = GameFontNormal:GetFont(), math.ceil(ICON_SI
 
 function auraProto:OnInitialize()
 	self.alpha = 1.0
-	
+
 	self:SetWidth(ICON_SIZE)
 	self:SetHeight(ICON_SIZE)
 
