@@ -26,6 +26,7 @@ local tinsert = _G.tinsert
 local tonumber = _G.tonumber
 local tostring = _G.tostring
 local tsort = _G.table.sort
+local UnitBuff = _G.UnitBuff
 local UnitCanAttack = _G.UnitCanAttack
 local UnitDebuff = _G.UnitDebuff
 local UnitGUID = _G.UnitGUID
