@@ -9,6 +9,8 @@ local _G = _G
 local band = _G.bit.band
 local ceil = _G.ceil
 local COMBATLOG_OBJECT_AFFILIATION_MINE = _G.COMBATLOG_OBJECT_AFFILIATION_MINE
+local COMBATLOG_OBJECT_REACTION_FRIENDLY = _G.COMBATLOG_OBJECT_REACTION_FRIENDLY
+local COMBATLOG_OBJECT_REACTION_MASK = _G.COMBATLOG_OBJECT_REACTION_MASK
 local CreateFrame = _G.CreateFrame
 local floor = _G.floor
 local GetSpellInfo = _G.GetSpellInfo
@@ -274,6 +276,9 @@ function addon:UPDATE_MOUSEOVER_UNIT(event)
 end
 
 function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceName, sourceFlags, destGUID, destName, destFlags, spellId, spellName, spellSchool, auraType, auraAmount)
+	if not band(destFlags, COMBATLOG_OBJECT_REACTION_MASK) == COMBATLOG_OBJECT_REACTION_FRIENDLY then
+		return
+	end
 
 	local unitFrame = destGUID and unitFrames[destGUID]
 
