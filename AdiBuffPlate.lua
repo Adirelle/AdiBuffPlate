@@ -144,13 +144,31 @@ function addon:LibNameplate_RecycleNameplate(event, nameplate)
 	end
 end
 
-function addon:AcceptAura(spellId, isMine, duration)
+function addon:AcceptAura(auraType, spellId, isMine, duration)
 	if SPELLS[spellId] then
 		return true, 2.5
 	elseif isMine and duration > 5 and duration <= 300 then
 		return true, 1
 	else
 		return false
+	end
+end
+
+local function iterateAuras(unit, index)
+	local name, rank, icon, count, dispelType, duration, expires, caster, isStealable, shouldConsolidate, spellID
+	if index >= 0 then
+		index = index + 1
+		name, rank, icon, count, dispelType, duration, expires, caster, isStealable, shouldConsolidate, spellID = UnitDebuff(unit, index)
+		if name then
+			return index, "DEBUFF", name, rank, icon, count, dispelType, duration, expires, caster, isStealable, shouldConsolidate, spellID
+		else
+			index = 0
+		end
+	end
+	index = index - 1
+	name, rank, icon, count, dispelType, duration, expires, caster, isStealable, shouldConsolidate, spellID = UnitBuff(unit, -index)
+	if name then
+		return index, "BUFF", name, rank, icon, count, dispelType, duration, expires, caster, isStealable, shouldConsolidate, spellID
 	end
 end
 
@@ -173,14 +191,12 @@ function addon:ScanUnit(event, unit)
 	end
 	local auraCount = 0
 	local updated = false
-	for i = 1, 1000 do
-		local name, _, icon, count, _, duration, expireTime, caster, _, _, spellId = UnitDebuff(unit, i)
-		if not name then break end
+	for index, auraType, name, _, icon, count, _, duration, expireTime, caster, _, _, spellId in iterateAuras, unit, 0 do
 		if not duration or duration == 0 then
 			duration, expireTime = huge, huge
 		end
 		local isMine = (caster == "player" or caster == "pet" or caster == "vehicle")
-		local accepted, scale = self:AcceptAura(spellId, isMine, duration)
+		local accepted, scale = self:AcceptAura(auraType, spellId, isMine, duration)
 		if accepted then
 			auraCount = auraCount + 1
 			toDelete[name] = nil
@@ -191,8 +207,8 @@ function addon:ScanUnit(event, unit)
 			end
 			local auraFrame = unitFrame.auras[name]
 			if not auraFrame then
-				self:Debug('Acquiring aura frame for', name, 'icon=', icon)
-				auraFrame = auraProto:Acquire(unitFrame, name, icon)
+				self:Debug('Acquiring aura frame for', name, 'icon=', icon, 'type=', auraType)
+				auraFrame = auraProto:Acquire(unitFrame, name, icon, auraType)
 			end
 			self:Debug(unit, name, duration, expireTime, count)
 			if auraFrame:Update(expireTime-duration, duration, count, scale) then
@@ -262,22 +278,20 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceNam
 	local unitFrame = destGUID and unitFrames[destGUID]
 
 	if event == 'SPELL_AURA_APPLIED' then
-		if auraType == 'DEBUFF' then
-			local isMine = band(sourceFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) ~= 0
-			local accepted, scale = self:AcceptAura(spellId, isMine, huge)
-			if accepted then
-				if not unitFrame then
-					unitFrame = unitProto:Acquire(destGUID)
-				end
-				local aura = unitFrame.auras[spellName]
-				if not aura then
-					local _, _, icon = GetSpellInfo(spellId)
-					aura = auraProto:Acquire(unitFrame, spellName, icon)
-					aura:Show()
-				end
-				if aura:Update(GetTime(), nil, auraAmount, scale) then
-					unitFrame:Layout()
-				end
+		local isMine = band(sourceFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) ~= 0
+		local accepted, scale = self:AcceptAura(auraType, spellId, isMine, huge)
+		if accepted then
+			if not unitFrame then
+				unitFrame = unitProto:Acquire(destGUID)
+			end
+			local aura = unitFrame.auras[spellName]
+			if not aura then
+				local _, _, icon = GetSpellInfo(spellId)
+				aura = auraProto:Acquire(unitFrame, spellName, icon, auraType)
+				aura:Show()
+			end
+			if aura:Update(GetTime(), nil, auraAmount, scale) then
+				unitFrame:Layout()
 			end
 		end
 		return
@@ -340,7 +354,8 @@ function unitProto:AttachToNameplate(nameplate)
 	if nameplate and nameplate ~= self.nameplate then
 		self.nameplate = nameplate
 		self:SetParent(nameplate)
-		self:SetPoint('TOP', nameplate, 'BOTTOM', 0, 0)
+		self:SetPoint('TOPLEFT', nameplate, 'BOTTOMLEFT', 0, 0)
+		self:SetPoint('TOPRIGHT', nameplate, 'BOTTOMRIGHT', 0, 0)
 		self:Show()
 		self:Layout()
 	end
@@ -369,14 +384,22 @@ function unitProto:Layout()
 		for _, aura in pairs(self.auras) do
 			tinsert(tmp, aura)
 		end
-		local width, height = 0, 0
+		local left, right, height = 0, 0, 0
 		tsort(tmp, SortAuras)
 		for i, aura in ipairs(tmp) do
-			aura:SetPoint("TOPLEFT", width, 0)
 			local w, h = aura:GetSize()
-			width, height = width + w, max(height, h)
+			if aura.type == "DEBUFF" then
+				aura:SetPoint("TOPLEFT", left, 0)
+				left = left + w
+			else
+				aura:SetPoint("TOPLEFT", -right, 0)
+				right = right + w
+			end
+			if h > height then
+				height = h
+			end
 		end
-		self:SetSize(width, height)
+		self:SetHeight(height)
 		wipe(tmp)
 	end
 end
@@ -420,8 +443,9 @@ function auraProto:OnInitialize()
 	self.Count = count
 end
 
-function auraProto:OnAcquire(unitFrame, spell, texture)
+function auraProto:OnAcquire(unitFrame, spell, texture, type)
 	self.spell = spell
+	self.type = type
 	self.unitFrame = unitFrame
 	self:SetTexture(texture)
 	self:SetParent(unitFrame)
