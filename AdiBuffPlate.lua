@@ -392,7 +392,7 @@ function unitProto:Layout()
 				aura:SetPoint("TOPLEFT", left, 0)
 				left = left + w
 			else
-				aura:SetPoint("TOPLEFT", -right, 0)
+				aura:SetPoint("TOPRIGHT", -right, 0)
 				right = right + w
 			end
 			if h > height then
@@ -454,6 +454,8 @@ function auraProto:OnAcquire(unitFrame, spell, texture, type)
 end
 
 function auraProto:OnRelease()
+	self:Hide()
+	self:ClearAllPoints()
 	self.unitFrame.auras[self.spell] = nil
 	self.unitFrame = nil
 end
