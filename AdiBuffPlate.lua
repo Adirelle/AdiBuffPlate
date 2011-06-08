@@ -378,9 +378,9 @@ end
 
 local function SortAuras(a, b)
 	if a.scale == b.scale then
-		return a:GetTimeLeft() > b:GetTimeLeft()
+		return a.expireTime < b.expireTime
 	else
-		return b.scale > a.scale
+		return a.scale > b.scale
 	end
 end
 
@@ -476,10 +476,6 @@ function auraProto:Update(start, duration, count, scale)
 	end
 end
 
-function auraProto:GetTimeLeft()
-	return self.expireTime and (self.expireTime - GetTime()) or huge
-end
-
 function auraProto:OnUpdate(elapsed)
 	local now = GetTime()
 	local timeLeft = self.expireTime - now
@@ -544,13 +540,13 @@ end
 function auraProto:SetDuration(start, duration)
 	self:SetAlpha(self.alpha)
 	start, duration = tonumber(start), tonumber(duration)
-	if start and duration then
+	if start and duration and duration < huge then
 		self.expireTime = start + duration
 		self.flashTime = max(min(duration / 3, 6), 3)
 		self.Countdown:Show()
 		self:SetScript('OnUpdate', self.OnUpdate)
 	else
-		self.expireTime, self.flashTime = nil, nil
+		self.expireTime, self.flashTime = huge, huge
 		self:SetScript('OnUpdate', nil)
 		self.Countdown:Hide()
 	end
