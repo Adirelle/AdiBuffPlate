@@ -336,6 +336,14 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceNam
 	end
 end
 
+-- 4.2 compat layer
+if select(4, GetBuildInfo()) == 40200 then
+	local Base_COMBAT_LOG_EVENT_UNFILTERED = addon.COMBAT_LOG_EVENT_UNFILTERED
+	function addon.COMBAT_LOG_EVENT_UNFILTERED(self, _, _, event, hideCaster, sourceGUID, sourceName, sourceFlags, _, destGUID, destName, destFlags, _, ...)
+		return Base_COMBAT_LOG_EVENT_UNFILTERED(self, _, _, event, hideCaster, sourceGUID, sourceName, sourceFlags, destGUID, destName, destFlags, ...)
+	end
+end
+
 -- Unit frame methods
 
 function unitProto:OnInitialize()
