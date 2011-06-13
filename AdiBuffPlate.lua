@@ -46,6 +46,7 @@ local DEFAULT_CONFIG = {
 }
 
 local LibNameplate = LibStub('LibNameplate-1.0')
+local LibDispellable = LibStub('LibDispellable-1.0')
 
 local SPELLS = {}
 for id, cat in pairs(LibStub('DRData-1.0'):GetSpells()) do
@@ -149,6 +150,8 @@ end
 
 function addon:AcceptAura(auraType, spellId, isMine, duration)
 	if SPELLS[spellId] then
+		return true, 2.5
+	elseif auraType == 'BUFF' and LibDispellable:IsEnrageEffect(spellId) then
 		return true, 2.5
 	elseif isMine and duration > 5 and duration <= 300 then
 		return true, 1
@@ -595,5 +598,52 @@ for i, id in pairs{
 	12323  -- Hamstring
 } do
 	SPELLS[id] = "snare"
+end
+
+--------------------------------------------------------------------------------
+-- Interesting player buffs
+--------------------------------------------------------------------------------
+
+for i, id in pairs{
+	-- DEATHKNIGHT:
+	49222, -- Bone Shield
+	55233, -- Vampiric Blood
+	48707, -- Anti-Magic Shell
+	49028, -- Dancing Rune Weapon
+	48792, -- Icebound Fortitude
+	-- DRUID:
+	29166, -- Innervate
+	22842, -- Frenzied Regeneration
+	22812, -- Barkskin
+	61336, -- Survival Instincts
+	-- HUNTER:
+	 5384, -- Feign Death
+	19263, -- Deterrence
+	-- MAGE:
+	45438, -- Ice Block
+	-- PALADIN:
+	54428, -- Divine Plea
+	  498, -- Divine Protection
+	 6940, -- Hand of Sacrifice
+	31850, -- Ardent Defender
+	86657, -- Ancient Guardian (prot)
+	 1022, -- Hand of Protection
+	  642, -- Divine Shield
+	-- PRIEST:
+	64901, -- Hymn of Hope
+	33206, -- Pain Suppression
+	47788, -- Guardian Spirit
+	-- ROGUE:
+	 5277, -- Evasion
+	31224, -- Cloak of Shadows
+	-- WARLOCK:
+	 7812, -- Sacrifice
+	-- WARRIOR:
+	 2565, -- Shield Block
+	55694, -- Enraged Regeneration
+	  871, -- Shield Wall
+	12975, -- Last Stand
+} do
+	SPELLS[id] = "buff"
 end
 
