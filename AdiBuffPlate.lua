@@ -144,7 +144,7 @@ function addon:LibNameplate_RecycleNameplate(event, nameplate)
 	local guid = LibNameplate:GetGUID(nameplate)
 	local unitFrame = guid and unitFrames[guid]
 	if unitFrame then
-		unitFrame:DetachFromNameplate(nameplate)
+		unitFrame:AttachToNameplate(nil)
 	end
 end
 
@@ -355,12 +355,11 @@ end
 function unitProto:OnAcquire(guid)
 	unitFrames[guid] = self
 	self.guid = guid
-	self.nameplate = nil
 	self:AttachToNameplate(LibNameplate:GetNameplateByGUID(guid))
 end
 
 function unitProto:OnRelease()
-	self:DetachFromNameplate(self.nameplate)
+	self:AttachToNameplate(nil)
 	unitFrames[self.guid] = nil
 	for spell, aura in pairs(self.auras) do
 		aura:Release()
@@ -368,22 +367,21 @@ function unitProto:OnRelease()
 end
 
 function unitProto:AttachToNameplate(nameplate)
-	if nameplate and nameplate ~= self.nameplate then
+	if self.nameplate ~= nameplate then
+		if self.nameplate then
+			self:SetParent(nil)
+			self:ClearAllPoints()
+		end
 		self.nameplate = nameplate
-		self:SetParent(nameplate)
-		self:SetPoint('TOPLEFT', nameplate, 'BOTTOMLEFT', 0, 0)
-		self:SetPoint('TOPRIGHT', nameplate, 'BOTTOMRIGHT', 0, 0)
-		self:Show()
-		self:Layout()
-	end
-end
-
-function unitProto:DetachFromNameplate(nameplate)
-	if self.nameplate and nameplate == self.nameplate then
-		self.nameplate = nil
-		self:SetParent(nil)
-		self:ClearAllPoints()
-		self:Hide()
+		if nameplate then
+			self:SetParent(nameplate)
+			self:SetPoint('TOPLEFT', nameplate, 'BOTTOMLEFT', 0, 0)
+			self:SetPoint('TOPRIGHT', nameplate, 'BOTTOMRIGHT', 0, 0)
+			self:Show()
+			self:Layout()
+		else
+			self:Hide()
+		end
 	end
 end
 
@@ -472,6 +470,7 @@ end
 
 function auraProto:OnRelease()
 	self:Hide()
+	self:SetParent(nil)
 	self:ClearAllPoints()
 	self.unitFrame.auras[self.spell] = nil
 	self.unitFrame = nil
