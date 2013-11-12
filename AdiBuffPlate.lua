@@ -45,7 +45,6 @@ local DEFAULT_CONFIG = {
 	anchor = {}
 }
 
-local LibNameplate = LibStub('LibNameplate-1.0')
 local LibDispellable = LibStub('LibDispellable-1.0')
 
 local SPELLS = {}
@@ -53,7 +52,7 @@ for id, cat in pairs(LibStub('DRData-1.0'):GetSpells()) do
 	SPELLS[id] = cat
 end
 
-local addon = LibStub('AceAddon-3.0'):NewAddon(addonName, 'AceEvent-3.0')
+local addon = LibStub('AceAddon-3.0'):NewAddon(addonName, 'AceEvent-3.0', 'LibNameplateRegistry-1.0')
 
 local function NewFrameHeap(namePrefix, frameType, parent, template)
 	--local baseFrame = CreateFrame(frameType, nil, parent, template)
@@ -122,27 +121,27 @@ function addon:OnEnable()
 	self:RegisterEvent('UPDATE_MOUSEOVER_UNIT')
 	self:RegisterEvent('COMBAT_LOG_EVENT_UNFILTERED')
 	self:RegisterEvent('PLAYER_DEAD')
-	LibNameplate.RegisterCallback(self, 'LibNameplate_FoundGUID')
-	LibNameplate.RegisterCallback(self, 'LibNameplate_RecycleNameplate')
+	self:LNR_RegisterCallback('LNR_ON_NEW_PLATE', 'NewPlate')
+	self:LNR_RegisterCallback('LNR_ON_GUID_FOUND', 'NewPlate')
+	self:LNR_RegisterCallback('LNR_ON_RECYCLE_PLATE', 'RecyclePlate')
 end
 
 function addon:OnDisable()
-	LibNameplate.UnregisterAllcallbacks(self)
+	self:LNR_UnregisterAllCallbacks()
 	for guid, unitFrame in pairs(unitFrames) do
 		unitFrame:Release()
 	end
 end
 
-function addon:LibNameplate_FoundGUID(event, nameplate, guid)
-	local unitFrame = guid and unitFrames[guid]
+function addon:NewPlate(event, nameplate, data)
+	local unitFrame = data.GUID and unitFrames[data.GUID]
 	if unitFrame then
 		unitFrame:AttachToNameplate(nameplate)
 	end
 end
 
-function addon:LibNameplate_RecycleNameplate(event, nameplate)
-	local guid = LibNameplate:GetGUID(nameplate)
-	local unitFrame = guid and unitFrames[guid]
+function addon:RecyclePlate(event, nameplate, data)
+	local unitFrame = data.GUID and unitFrames[data.GUID]
 	if unitFrame then
 		unitFrame:DetachFromNameplate(nameplate)
 	end
@@ -349,7 +348,7 @@ function unitProto:OnAcquire(guid)
 	unitFrames[guid] = self
 	self.guid = guid
 	self.nameplate = nil
-	self:AttachToNameplate(LibNameplate:GetNameplateByGUID(guid))
+	self:AttachToNameplate(addon:GetPlateByGUID(guid))
 end
 
 function unitProto:OnRelease()
