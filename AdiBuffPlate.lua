@@ -285,9 +285,17 @@ function addon:UPDATE_MOUSEOVER_UNIT(event)
 	end
 end
 
+local eventFilter = {
+	UNIT_DIED = true,
+	SPELL_AURA_APPLIED = true,
+	SPELL_AURA_REMOVED = true,
+	SPELL_AURA_APPLIED_DOSE = true,
+	SPELL_AURA_REMOVED_DOSE = true,
+	SPELL_AURA_REFRESH = true,
+}
 function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceName, sourceFlags, _, destGUID, destName, destFlags, _, spellId, spellName, spellSchool, auraType, auraAmount)
 
-	if not band(destFlags, COMBATLOG_OBJECT_REACTION_MASK) == COMBATLOG_OBJECT_REACTION_FRIENDLY then
+	if not band(destFlags, COMBATLOG_OBJECT_REACTION_MASK) == COMBATLOG_OBJECT_REACTION_FRIENDLY or not eventFilter[event] then
 		return
 	end
 
