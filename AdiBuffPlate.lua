@@ -122,7 +122,7 @@ function addon:OnEnable()
 	self:RegisterEvent('COMBAT_LOG_EVENT_UNFILTERED')
 	self:RegisterEvent('PLAYER_DEAD')
 	self:LNR_RegisterCallback('LNR_ON_NEW_PLATE', 'NewPlate')
-	self:LNR_RegisterCallback('LNR_ON_GUID_FOUND', 'NewPlate')
+	self:LNR_RegisterCallback('LNR_ON_GUID_FOUND', 'PlateGUIDFound')
 	self:LNR_RegisterCallback('LNR_ON_RECYCLE_PLATE', 'RecyclePlate')
 end
 
@@ -134,7 +134,14 @@ function addon:OnDisable()
 end
 
 function addon:NewPlate(event, nameplate, data)
-	local unitFrame = data.GUID and unitFrames[data.GUID]
+	if data.GUID then
+		return self:PlateGUIDFound(event, nameplate, data.GUID)
+	end
+end
+
+function addon:PlateGUIDFound(event, nameplate, guid)
+	local unitFrame = unitFrames[guid]
+	self:Debug('PlateGUIDFound', event, 'nameplate=', nameplate, 'GUID=', guid, 'unitFrame=', unitFrame)
 	if unitFrame then
 		unitFrame:AttachToNameplate(nameplate)
 	end
