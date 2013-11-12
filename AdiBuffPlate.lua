@@ -147,10 +147,12 @@ function addon:PlateGUIDFound(event, nameplate, guid)
 	end
 end
 
-function addon:RecyclePlate(event, nameplate, data)
-	local unitFrame = data.GUID and unitFrames[data.GUID]
-	if unitFrame then
-		unitFrame:AttachToNameplate(nil)
+function addon:RecyclePlate(event, nameplate)
+	for guid, unitFrame in pairs(unitFrames) do
+		if unitFrame.nameplate == nameplate then
+			unitFrame:AttachToNameplate(nil)
+			return
+		end
 	end
 end
 
