@@ -561,42 +561,37 @@ end
 --------------------------------------------------------------------------------
 
 for i, id in pairs{
-	 1604, -- Dazed
-	45524, -- Chains of Ice
-	50434, -- Chilblains
-	58617, -- Glyph of Heart Strike
-	68766, -- Desecration
-	50259, -- Dazed (feral charge effect)
-	58180, -- Infected Wounds
-	61391, -- Typhoon
-	31589, -- Slow
-	44614, -- Frostfire Bolt
-	 2974, -- Wing Clip
-	 5116, -- Concussive Shot
-	13810, -- Ice Trap
-	35101, -- Concussive Barrage
-	35346, -- Time Warp (Warp Stalker)
-	50433, -- Ankle Crack (Crocolisk)
-	54644, -- Frost Breath (Chimaera)
-	61394, -- Frozen Wake (glyph)
-	  116, -- Frostbolt
-	  120, -- Cone of Cold
-	 6136, -- Chilled
-	 7321, -- Chilled (bis)
-	11113, -- Blast Wave
-	 3409, -- Crippling Poison
-	26679, -- Deadly Throw
-	31126, -- Blade Twisting
-	51693, -- Waylay
-	51585, -- Blade Twisting
-	 3600, -- Earthbind
-	 8034, -- Frostbrand Attack
-	 8056, -- Frost Shock
-	 8178, -- Grounding Totem Effect
-	18118, -- Aftermath
-	18223, -- Curse of Exhaustion
-	 1715, -- Piercing Howl
-	12323  -- Hamstring
+	  1604, -- Dazed (common),
+	 45524, -- Chains of Ice (death knight)
+	 50259, -- Dazed (feral charge effect)
+	 58180, -- Infected Wounds (druid)
+	 61391, -- Typhoon (druid)
+	  5116, -- Concussive Shot (hunter)
+	 13810, -- Ice Trap (hunter)
+	 35101, -- Concussive Barrage (hunter, passive)
+	 35346, -- Time Warp (hunter, warp Stalker)
+	 50433, -- Ankle Crack (hunter, crocolisk)
+	 54644, -- Frost Breath (hunter, chimaera)
+	 61394, -- Frozen Wake (hunter, glyph)
+	 31589, -- Slow (mage)
+	 44614, -- Frostfire Bolt (mage)
+	   116, -- Frostbolt (mage)
+	   120, -- Cone of Cold (mage)
+	  6136, -- Chilled (mage)
+	  7321, -- Chilled (mage, bis)
+	 11113, -- Blast Wave (mage)
+	116095, -- Disable (monk, 1 stack)
+	  1044, -- Hand of Freedom (paladin)
+	  3409, -- Crippling Poison (rogue)
+	 26679, -- Deadly Throw (rogue)
+	  3600, -- Earthbind (shaman)
+	  8034, -- Frostbrand Attack (shaman)
+	  8056, -- Frost Shock (shaman)
+	  8178, -- Grounding Totem Effect (shaman)
+	 18223, -- Curse of Exhaustion (warlock)
+	 17962, -- Conflagrate (warlock)
+	  1715, -- Piercing Howl (warrior)
+	 12323  -- Hamstring (warrior)
 } do
 	SPELLS[id] = "snare"
 end
