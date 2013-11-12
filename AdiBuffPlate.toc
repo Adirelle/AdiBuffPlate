@@ -1,4 +1,4 @@
-## Interface: 40100
+## Interface: 50400
 
 ## Title: AdiBuffPlate
 ## Notes: Show Damage over Time debuffs.
@@ -6,7 +6,7 @@
 ## Version: @project-version@
 #-# LoadManagers: AddonLoader
 #-# X-LoadOn-Always: delayed
-## OptionalDeps: Ace3, LibNameplate-1.0, DRData-1.0, LibDispellable-1.0, AdiDebug
+## OptionalDeps: Ace3, LibNameplateRegistry-1.0, DRData-1.0, LibDispellable-1.0, AdiDebug
 ## SavedVariables: AdiBuffPlateDB
 
 AdiBuffPlate.lua

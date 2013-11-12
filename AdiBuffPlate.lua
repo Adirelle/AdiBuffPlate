@@ -45,7 +45,6 @@ local DEFAULT_CONFIG = {
 	anchor = {}
 }
 
-local LibNameplate = LibStub('LibNameplate-1.0')
 local LibDispellable = LibStub('LibDispellable-1.0')
 
 local SPELLS = {}
@@ -53,7 +52,7 @@ for id, cat in pairs(LibStub('DRData-1.0'):GetSpells()) do
 	SPELLS[id] = cat
 end
 
-local addon = LibStub('AceAddon-3.0'):NewAddon(addonName, 'AceEvent-3.0')
+local addon = LibStub('AceAddon-3.0'):NewAddon(addonName, 'AceEvent-3.0', 'LibNameplateRegistry-1.0')
 
 local function NewFrameHeap(namePrefix, frameType, parent, template)
 	--local baseFrame = CreateFrame(frameType, nil, parent, template)
@@ -122,27 +121,34 @@ function addon:OnEnable()
 	self:RegisterEvent('UPDATE_MOUSEOVER_UNIT')
 	self:RegisterEvent('COMBAT_LOG_EVENT_UNFILTERED')
 	self:RegisterEvent('PLAYER_DEAD')
-	LibNameplate.RegisterCallback(self, 'LibNameplate_FoundGUID')
-	LibNameplate.RegisterCallback(self, 'LibNameplate_RecycleNameplate')
+	self:LNR_RegisterCallback('LNR_ON_NEW_PLATE', 'NewPlate')
+	self:LNR_RegisterCallback('LNR_ON_GUID_FOUND', 'PlateGUIDFound')
+	self:LNR_RegisterCallback('LNR_ON_RECYCLE_PLATE', 'RecyclePlate')
 end
 
 function addon:OnDisable()
-	LibNameplate.UnregisterAllcallbacks(self)
+	self:LNR_UnregisterAllCallbacks()
 	for guid, unitFrame in pairs(unitFrames) do
 		unitFrame:Release()
 	end
 end
 
-function addon:LibNameplate_FoundGUID(event, nameplate, guid)
-	local unitFrame = guid and unitFrames[guid]
+function addon:NewPlate(event, nameplate, data)
+	if data.GUID then
+		return self:PlateGUIDFound(event, nameplate, data.GUID)
+	end
+end
+
+function addon:PlateGUIDFound(event, nameplate, guid)
+	local unitFrame = unitFrames[guid]
+	self:Debug('PlateGUIDFound', event, 'nameplate=', nameplate, 'GUID=', guid, 'unitFrame=', unitFrame)
 	if unitFrame then
 		unitFrame:AttachToNameplate(nameplate)
 	end
 end
 
-function addon:LibNameplate_RecycleNameplate(event, nameplate)
-	local guid = LibNameplate:GetGUID(nameplate)
-	local unitFrame = guid and unitFrames[guid]
+function addon:RecyclePlate(event, nameplate, data)
+	local unitFrame = data.GUID and unitFrames[data.GUID]
 	if unitFrame then
 		unitFrame:AttachToNameplate(nil)
 	end
@@ -279,8 +285,17 @@ function addon:UPDATE_MOUSEOVER_UNIT(event)
 	end
 end
 
-function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceName, sourceFlags, destGUID, destName, destFlags, spellId, spellName, spellSchool, auraType, auraAmount)
-	if not band(destFlags, COMBATLOG_OBJECT_REACTION_MASK) == COMBATLOG_OBJECT_REACTION_FRIENDLY then
+local eventFilter = {
+	UNIT_DIED = true,
+	SPELL_AURA_APPLIED = true,
+	SPELL_AURA_REMOVED = true,
+	SPELL_AURA_APPLIED_DOSE = true,
+	SPELL_AURA_REMOVED_DOSE = true,
+	SPELL_AURA_REFRESH = true,
+}
+function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceName, sourceFlags, _, destGUID, destName, destFlags, _, spellId, spellName, spellSchool, auraType, auraAmount)
+
+	if not band(destFlags, COMBATLOG_OBJECT_REACTION_MASK) == COMBATLOG_OBJECT_REACTION_FRIENDLY or not eventFilter[event] then
 		return
 	end
 
@@ -336,14 +351,6 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceNam
 	end
 end
 
--- 4.2 compat layer
-if select(4, GetBuildInfo()) == 40200 then
-	local Base_COMBAT_LOG_EVENT_UNFILTERED = addon.COMBAT_LOG_EVENT_UNFILTERED
-	function addon.COMBAT_LOG_EVENT_UNFILTERED(self, _, _, event, hideCaster, sourceGUID, sourceName, sourceFlags, _, destGUID, destName, destFlags, _, ...)
-		return Base_COMBAT_LOG_EVENT_UNFILTERED(self, _, _, event, hideCaster, sourceGUID, sourceName, sourceFlags, destGUID, destName, destFlags, ...)
-	end
-end
-
 -- Unit frame methods
 
 function unitProto:OnInitialize()
@@ -355,7 +362,7 @@ end
 function unitProto:OnAcquire(guid)
 	unitFrames[guid] = self
 	self.guid = guid
-	self:AttachToNameplate(LibNameplate:GetNameplateByGUID(guid))
+	self:AttachToNameplate(addon:GetPlateByGUID(guid))
 end
 
 function unitProto:OnRelease()
@@ -567,42 +574,37 @@ end
 --------------------------------------------------------------------------------
 
 for i, id in pairs{
-	 1604, -- Dazed
-	45524, -- Chains of Ice
-	50434, -- Chilblains
-	58617, -- Glyph of Heart Strike
-	68766, -- Desecration
-	50259, -- Dazed (feral charge effect)
-	58180, -- Infected Wounds
-	61391, -- Typhoon
-	31589, -- Slow
-	44614, -- Frostfire Bolt
-	 2974, -- Wing Clip
-	 5116, -- Concussive Shot
-	13810, -- Ice Trap
-	35101, -- Concussive Barrage
-	35346, -- Time Warp (Warp Stalker)
-	50433, -- Ankle Crack (Crocolisk)
-	54644, -- Frost Breath (Chimaera)
-	61394, -- Frozen Wake (glyph)
-	  116, -- Frostbolt
-	  120, -- Cone of Cold
-	 6136, -- Chilled
-	 7321, -- Chilled (bis)
-	11113, -- Blast Wave
-	 3409, -- Crippling Poison
-	26679, -- Deadly Throw
-	31126, -- Blade Twisting
-	51693, -- Waylay
-	51585, -- Blade Twisting
-	 3600, -- Earthbind
-	 8034, -- Frostbrand Attack
-	 8056, -- Frost Shock
-	 8178, -- Grounding Totem Effect
-	18118, -- Aftermath
-	18223, -- Curse of Exhaustion
-	 1715, -- Piercing Howl
-	12323  -- Hamstring
+	  1604, -- Dazed (common),
+	 45524, -- Chains of Ice (death knight)
+	 50259, -- Dazed (feral charge effect)
+	 58180, -- Infected Wounds (druid)
+	 61391, -- Typhoon (druid)
+	  5116, -- Concussive Shot (hunter)
+	 13810, -- Ice Trap (hunter)
+	 35101, -- Concussive Barrage (hunter, passive)
+	 35346, -- Time Warp (hunter, warp Stalker)
+	 50433, -- Ankle Crack (hunter, crocolisk)
+	 54644, -- Frost Breath (hunter, chimaera)
+	 61394, -- Frozen Wake (hunter, glyph)
+	 31589, -- Slow (mage)
+	 44614, -- Frostfire Bolt (mage)
+	   116, -- Frostbolt (mage)
+	   120, -- Cone of Cold (mage)
+	  6136, -- Chilled (mage)
+	  7321, -- Chilled (mage, bis)
+	 11113, -- Blast Wave (mage)
+	116095, -- Disable (monk, 1 stack)
+	  1044, -- Hand of Freedom (paladin)
+	  3409, -- Crippling Poison (rogue)
+	 26679, -- Deadly Throw (rogue)
+	  3600, -- Earthbind (shaman)
+	  8034, -- Frostbrand Attack (shaman)
+	  8056, -- Frost Shock (shaman)
+	  8178, -- Grounding Totem Effect (shaman)
+	 18223, -- Curse of Exhaustion (warlock)
+	 17962, -- Conflagrate (warlock)
+	  1715, -- Piercing Howl (warrior)
+	 12323  -- Hamstring (warrior)
 } do
 	SPELLS[id] = "snare"
 end
