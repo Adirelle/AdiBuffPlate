@@ -279,7 +279,8 @@ function addon:UPDATE_MOUSEOVER_UNIT(event)
 	end
 end
 
-function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceName, sourceFlags, destGUID, destName, destFlags, spellId, spellName, spellSchool, auraType, auraAmount)
+function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceName, sourceFlags, _, destGUID, destName, destFlags, _, spellId, spellName, spellSchool, auraType, auraAmount)
+
 	if not band(destFlags, COMBATLOG_OBJECT_REACTION_MASK) == COMBATLOG_OBJECT_REACTION_FRIENDLY then
 		return
 	end
@@ -333,14 +334,6 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceNam
 		if aura:Update(GetTime(), aura.duration, aura.count) then
 			unitFrame:Layout()
 		end
-	end
-end
-
--- 4.2 compat layer
-if select(4, GetBuildInfo()) == 40200 then
-	local Base_COMBAT_LOG_EVENT_UNFILTERED = addon.COMBAT_LOG_EVENT_UNFILTERED
-	function addon.COMBAT_LOG_EVENT_UNFILTERED(self, _, _, event, hideCaster, sourceGUID, sourceName, sourceFlags, _, destGUID, destName, destFlags, _, ...)
-		return Base_COMBAT_LOG_EVENT_UNFILTERED(self, _, _, event, hideCaster, sourceGUID, sourceName, sourceFlags, destGUID, destName, destFlags, ...)
 	end
 end
 

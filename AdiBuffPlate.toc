@@ -1,4 +1,4 @@
-## Interface: 40100
+## Interface: 50400
 
 ## Title: AdiBuffPlate
 ## Notes: Show Damage over Time debuffs.
