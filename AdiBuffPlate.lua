@@ -402,30 +402,42 @@ local function SortAuras(a, b)
 	end
 end
 
-local tmp = {}
 function unitProto:Layout()
-	if self:IsShown() then
-		for _, aura in pairs(self.auras) do
-			tinsert(tmp, aura)
-		end
-		local left, right, height = 0, 0, 0
-		tsort(tmp, SortAuras)
-		for i, aura in ipairs(tmp) do
-			local w, h = aura:GetSize()
-			if aura.type == "DEBUFF" then
-				aura:SetPoint("TOPLEFT", left, 0)
-				left = left + w
-			else
-				aura:SetPoint("TOPRIGHT", -right, 0)
-				right = right + w
-			end
-			if h > height then
-				height = h
-			end
-		end
-		self:SetHeight(height)
-		wipe(tmp)
+	self:SetScript('OnUpdate', self.DoLayout)
+end
+
+local tmp = {}
+function unitProto:DoLayout()
+	self:SetScript('OnUpdate', nil)
+	if not self.nameplate then
+		self:Debug('No attached to a nameplate, hiding')
+		return self:Hide()
+	elseif addon:GetPlateGUID(self.nameplate) ~= self.guid then
+		self:Debug('GUID mismatch, hiding')
+		return self:Hide()
 	end
+	self:Debug('Layout')
+
+	for _, aura in pairs(self.auras) do
+		tinsert(tmp, aura)
+	end
+	local left, right, height = 0, 0, 0
+	tsort(tmp, SortAuras)
+	for i, aura in ipairs(tmp) do
+		local w, h = aura:GetSize()
+		if aura.type == "DEBUFF" then
+			aura:SetPoint("TOPLEFT", left, 0)
+			left = left + w
+		else
+			aura:SetPoint("TOPRIGHT", -right, 0)
+			right = right + w
+		end
+		if h > height then
+			height = h
+		end
+	end
+	self:SetHeight(height)
+	wipe(tmp)
 end
 
 -- Aura frame methods
