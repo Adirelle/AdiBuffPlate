@@ -133,6 +133,10 @@ function addon:OnDisable()
 	end
 end
 
+function addon:GetUnitFrameForGUID(guid, noSpawn)
+	return guid and (unitFrames[guid] or (not noSpawn and unitProto:Acquire(guid)))
+end
+
 function addon:NewPlate(event, nameplate, data)
 	if data.GUID then
 		return self:PlateGUIDFound(event, nameplate, data.GUID)
@@ -140,17 +144,16 @@ function addon:NewPlate(event, nameplate, data)
 end
 
 function addon:PlateGUIDFound(event, nameplate, guid)
-	local unitFrame = unitFrames[guid]
-	self:Debug('PlateGUIDFound', event, 'nameplate=', nameplate, 'GUID=', guid, 'unitFrame=', unitFrame)
-	if unitFrame then
-		unitFrame:AttachToNameplate(nameplate)
+	if unitFrames[guid] then
+		unitFrames[guid]:SetNameplate(nameplate)
 	end
 end
 
 function addon:RecyclePlate(event, nameplate, data)
 	local unitFrame = data.GUID and unitFrames[data.GUID]
-	if unitFrame then
-		unitFrame:DetachFromNameplate(nameplate)
+	if unitFrame and unitFrame.nameplate == nameplate then
+		self:Debug('RecyclePlate', event, 'nameplate=', nameplate, 'GUID=', data.GUID, 'unitFrame=', unitFrame)
+		unitFrame:SetNameplate(nil)
 	end
 end
 
@@ -184,7 +187,7 @@ local function iterateAuras(unit, index)
 	end
 end
 
-local toDelete = {}
+local gen = 0
 function addon:ScanUnit(event, unit)
 	local guid = UnitGUID(unit)
 	if not guid then return end
@@ -195,14 +198,8 @@ function addon:ScanUnit(event, unit)
 		return
 	end
 	self:Debug('Scanning', unit, 'on', event)
-	local unitFrame = unitFrames[guid]
-	if unitFrame then
-		for spell, aura in pairs(unitFrame.auras) do
-			toDelete[spell] = aura
-		end
-	end
-	local auraCount = 0
-	local updated = false
+	local unitFrame
+	gen = (gen + 1) % 10000
 	for index, auraType, name, _, icon, count, _, duration, expireTime, caster, _, _, spellId in iterateAuras, unit, 0 do
 		if not duration or duration == 0 then
 			duration, expireTime = huge, huge
@@ -210,42 +207,22 @@ function addon:ScanUnit(event, unit)
 		local isMine = (caster == "player" or caster == "pet" or caster == "vehicle")
 		local accepted, scale = self:AcceptAura(auraType, spellId, isMine, duration)
 		if accepted then
-			auraCount = auraCount + 1
-			toDelete[name] = nil
-			if not unitFrame then
-				self:Debug('Acquiring unit frame for', guid, 'unit=', unit)
-				unitFrame = unitProto:Acquire(guid)
-				updated = true
-			end
-			local auraFrame = unitFrame.auras[name]
-			if not auraFrame then
-				self:Debug('Acquiring aura frame for', name, 'icon=', icon, 'type=', auraType)
-				auraFrame = auraProto:Acquire(unitFrame, name, icon, auraType)
-			end
-			self:Debug(unit, name, duration, expireTime, count)
-			if auraFrame:Update(expireTime-duration, duration, count, scale) then
-				updated = true
-			end
-			auraFrame:Show()
+			unitFrame = unitFrame or addon:GetUnitFrameForGUID(guid)
+			local aura = unitFrame:GetAura(name, icon, auraType)
+			aura:SetDuration(expireTime-duration, duration)
+			aura:SetCount(count)
+			aura:SetScale(scale)
+			aura.gen = gen
 		end
 	end
-	self:Debug('Scanned unit', unit, 'guid=', guid, 'auraCount=', auraCount)
-	if auraCount == 0 then
-		if unitFrame then
-			wipe(toDelete)
-			unitFrame:Release()
-		end
-	elseif unitFrame then
-		if next(toDelete) then
-			for spell, aura in pairs(toDelete) do
-				aura:Release()
-				updated = true
+	if unitFrame then
+		for name, aura in pairs(unitFrame.auras) do
+			if aura.gen ~= gen then
+				unitFrame:RemoveAura(name)
 			end
-			wipe(toDelete)
 		end
-		if updated then
-			unitFrame:Layout()
-		end
+	elseif unitFrames[guid] then
+		unitFrames[guid]:Release()
 	end
 end
 
@@ -299,28 +276,20 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceNam
 		return
 	end
 
-	local unitFrame = destGUID and unitFrames[destGUID]
-
 	if event == 'SPELL_AURA_APPLIED' then
 		local isMine = band(sourceFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) ~= 0
 		local accepted, scale = self:AcceptAura(auraType, spellId, isMine, huge)
 		if accepted then
-			if not unitFrame then
-				unitFrame = unitProto:Acquire(destGUID)
-			end
-			local aura = unitFrame.auras[spellName]
-			if not aura then
-				local _, _, icon = GetSpellInfo(spellId)
-				aura = auraProto:Acquire(unitFrame, spellName, icon, auraType)
-				aura:Show()
-			end
-			if aura:Update(GetTime(), nil, auraAmount, scale) then
-				unitFrame:Layout()
-			end
+			local unitFrame = addon:GetUnitFrameForGUID(destGUID)
+			local _, _, icon = GetSpellInfo(spellId)
+			local aura = unitFrame:GetAura(spellName, icon, auraType)
+			aura:SetCount(auraAmount)
+			aura:SetScale(scale)
 		end
 		return
 	end
 
+	local unitFrame = addon:GetUnitFrameForGUID(destGUID, true)
 	if not unitFrame then return end
 
 	if event == 'UNIT_DIED' then
@@ -330,24 +299,18 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceNam
 		return
 	end
 
-	local aura = spellName and unitFrame.auras[spellName]
-	if not aura then return end
-	self:Debug(event, 'source=', sourceName, 'target=', destName, 'spell=', spellName)
+	if not unitFrame:HasAura(spellName) then return end
+
 	if event == 'SPELL_AURA_REMOVED' then
-		aura:Release()
-		unitFrame:Layout()
-	elseif event == 'SPELL_AURA_APPLIED_DOSE' then
-		if aura:Update(GetTime(), aura.duration, auraAmount) then
-			unitFrame:Layout()
-		end
-	elseif event == 'SPELL_AURA_REMOVED_DOSE' then
-		if aura:Update(aura.start, aura.duration, auraAmount) then
-			unitFrame:Layout()
-		end
-	elseif event == 'SPELL_AURA_REFRESH' then
-		if aura:Update(GetTime(), aura.duration, aura.count) then
-			unitFrame:Layout()
-		end
+		unitFrame:RemoveAura(spellName)
+	end
+
+	local aura = unitFrame:GetAura(spellName)
+	if event == 'SPELL_AURA_APPLIED_DOSE' or event == 'SPELL_AURA_REFRESH' then
+		aura:SetDuration(GetTime(), aura.duration)
+	end
+	if event == 'SPELL_AURA_APPLIED_DOSE' or event == 'SPELL_AURA_REMOVED_DOSE' then
+		aura:SetCount(auraAmount)
 	end
 end
 
@@ -355,40 +318,72 @@ end
 
 function unitProto:OnInitialize()
 	self.auras = {}
-	self:SetWidth(ICON_SIZE)
-	self:SetHeight(ICON_SIZE)
+	self:SetSize(ICON_SIZE, ICON_SIZE)
+	self:Hide()
+	self:SetScript('OnShow', self.OnShow)
+	self:SetScript('OnHide', self.OnHide)
 end
 
 function unitProto:OnAcquire(guid)
 	unitFrames[guid] = self
 	self.guid = guid
-	self.nameplate = nil
-	self:AttachToNameplate(addon:GetPlateByGUID(guid))
+	self:SetNameplate(addon:GetPlateByGUID(guid))
 end
 
 function unitProto:OnRelease()
-	self:DetachFromNameplate(self.nameplate)
+	self:SetNameplate(nil)
 	unitFrames[self.guid] = nil
 	for spell, aura in pairs(self.auras) do
 		aura:Release()
 	end
 end
 
-function unitProto:AttachToNameplate(nameplate)
-	if nameplate and nameplate ~= self.nameplate then
-		self.nameplate = nameplate
-		self:SetParent(nameplate)
-		self:SetPoint('TOPLEFT', nameplate, 'BOTTOMLEFT', 0, 0)
-		self:SetPoint('TOPRIGHT', nameplate, 'BOTTOMRIGHT', 0, 0)
-		self:Show()
+function unitProto:OnShow()
+	self:Debug('OnShow')
+	self:Layout()
+end
+
+function unitProto:OnHide()
+	self:Debug('OnHide')
+	self:SetNameplate(nil)
+end
+
+function unitProto:HasAura(name)
+	return self.auras[name] ~= nil
+end
+
+function unitProto:GetAura(name, icon, auraType, noSpawn)
+	local aura = self.auras[name]
+	if not aura and not noSpawn then
+		aura = auraProto:Acquire(self, name, icon, auraType)
+		self.auras[name] = aura
 		self:Layout()
+	end
+	return aura
+end
+
+function unitProto:RemoveAura(name)
+	local aura = self.auras[name]
+	if not aura then return end
+	self.auras[name] = nil
+	aura:Release()
+	if next(self.auras) then
+		self:Layout()
+	else
+		self:Release()
 	end
 end
 
-function unitProto:DetachFromNameplate(nameplate)
-	if self.nameplate and nameplate == self.nameplate then
-		self.nameplate = nil
-		self:SetParent(nil)
+function unitProto:SetNameplate(nameplate)
+	if nameplate == self.nameplate then return end
+	self:Debug('SetNameplate', nameplate)
+	self.nameplate = nameplate
+	self:SetParent(nameplate)
+	if nameplate then
+		self:SetPoint('TOPLEFT', nameplate, 'BOTTOMLEFT', 0, 0)
+		self:SetPoint('TOPRIGHT', nameplate, 'BOTTOMRIGHT', 0, 0)
+		self:Show()
+	else
 		self:ClearAllPoints()
 		self:Hide()
 	end
@@ -485,32 +480,21 @@ function auraProto:OnAcquire(unitFrame, spell, texture, type)
 	self.unitFrame = unitFrame
 	self:SetTexture(texture)
 	self:SetParent(unitFrame)
-	unitFrame.auras[spell] = self
 	self:Show()
 end
 
 function auraProto:OnRelease()
 	self:Hide()
 	self:ClearAllPoints()
-	self.unitFrame.auras[self.spell] = nil
+	self:SetParent(nil)
 	self.unitFrame = nil
-end
-
-function auraProto:Update(start, duration, count, scale)
-	if self.start ~= start or self.duration ~= duration or self.count ~= count or self.scale ~= scale then
-		self.start, self.duration, self.count = start, duration, count
-		self:SetDuration(start, duration)
-		self:SetCount(count)
-		self:SetScale(scale)
-		return true
-	end
 end
 
 function auraProto:OnUpdate(elapsed)
 	local now = GetTime()
 	local timeLeft = self.expireTime - now
 	if timeLeft <=0 then
-		return self:Release()
+		return self.unitFrame:RemoveAura(self)
 	end
 	local countdown = self.Countdown
 	if timeLeft < self.flashTime or self.scale > 1.0 then
@@ -564,12 +548,14 @@ function auraProto:SetScale(scale)
 	if scale ~= self.scale then
 		self.scale = scale
 		self:SetSize(ICON_SIZE * scale, ICON_SIZE * scale)
+		self.unitFrame:Layout()
 	end
 end
 
 function auraProto:SetDuration(start, duration)
 	self:SetAlpha(self.alpha)
 	start, duration = tonumber(start), tonumber(duration)
+	if self.start == start and self.duration == duration then return end
 	if start and duration and duration < huge then
 		self.expireTime = start + duration
 		self.flashTime = max(min(duration / 3, 6), 3)
@@ -580,6 +566,7 @@ function auraProto:SetDuration(start, duration)
 		self:SetScript('OnUpdate', nil)
 		self.Countdown:Hide()
 	end
+	self.unitFrame:Layout()
 end
 
 --------------------------------------------------------------------------------
