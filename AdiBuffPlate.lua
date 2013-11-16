@@ -420,20 +420,27 @@ function unitProto:DoLayout()
 	for _, aura in pairs(self.auras) do
 		tinsert(tmp, aura)
 	end
-	local left, right, height = 0, 0, 0
+	local height = 0
 	tsort(tmp, SortAuras)
+	local prevBuff, prevDebuff
 	for i, aura in ipairs(tmp) do
-		local w, h = aura:GetSize()
+		aura:ClearAllPoints()
 		if aura.type == "DEBUFF" then
-			aura:SetPoint("TOPLEFT", left, 0)
-			left = left + w
+			if prevDebuff then
+				aura:SetPoint("TOPLEFT", prevDebuff, "TOPRIGHT")
+			else
+				aura:SetPoint("TOPLEFT")
+			end
+			prevDebuff = aura
 		else
-			aura:SetPoint("TOPRIGHT", -right, 0)
-			right = right + w
+			if prevBuff then
+				aura:SetPoint("TOPRIGHT", prevBuff, "TOPLEFT")
+			else
+				aura:SetPoint("TOPRIGHT")
+			end
+			prevBuff = aura
 		end
-		if h > height then
-			height = h
-		end
+		height = max(height, aura:GetHeight())
 	end
 	self:SetHeight(height)
 	wipe(tmp)
