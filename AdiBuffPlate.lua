@@ -572,10 +572,10 @@ function auraProto:SetScale(scale)
 end
 
 function auraProto:SetDuration(start, duration)
-	self:SetAlpha(self.alpha)
-	start, duration = tonumber(start), tonumber(duration)
+	start, duration = tonumber(start) or 0, tonumber(duration) or 0
 	if self.start == start and self.duration == duration then return end
-	if start and duration and duration < huge then
+	self:SetAlpha(self.alpha)
+	if start > 0 and duration > 0 and duration < huge then
 		self.expireTime = start + duration
 		self.flashTime = max(min(duration / 3, 6), 3)
 		self.Countdown:Show()
