@@ -549,11 +549,14 @@ end
 
 function auraProto:SetCount(count)
 	count = tonumber(count) or 0
-	if count > 1 then
-		self.Count:SetText(count)
-		self.Count:Show()
-	else
-		self.Count:Hide()
+	if self.count ~= count then
+		self.count = count
+		if (count or 0) > 1 then
+			self.Count:SetText(count)
+			self.Count:Show()
+		else
+			self.Count:Hide()
+		end
 	end
 end
 
