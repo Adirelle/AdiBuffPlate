@@ -208,7 +208,7 @@ function addon:ScanUnit(event, unit)
 		local accepted, scale = self:AcceptAura(auraType, spellId, isMine, duration)
 		if accepted then
 			unitFrame = unitFrame or addon:GetUnitFrameForGUID(guid)
-			local aura = unitFrame:GetAura(name, icon, auraType)
+			local aura = unitFrame:GetAura(name, auraType, icon)
 			aura:SetDuration(expireTime-duration, duration)
 			aura:SetCount(count)
 			aura:SetScale(scale)
@@ -281,8 +281,7 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceNam
 		local accepted, scale = self:AcceptAura(auraType, spellId, isMine, huge)
 		if accepted then
 			local unitFrame = addon:GetUnitFrameForGUID(destGUID)
-			local _, _, icon = GetSpellInfo(spellId)
-			local aura = unitFrame:GetAura(spellName, icon, auraType)
+			local aura = unitFrame:GetAura(spellName, auraType)
 			aura:SetCount(auraAmount)
 			aura:SetScale(scale)
 		end
@@ -305,7 +304,7 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceNam
 		unitFrame:RemoveAura(spellName)
 	end
 
-	local aura = unitFrame:GetAura(spellName)
+	local aura = unitFrame:GetAura(spellName, auraType)
 	if event == 'SPELL_AURA_APPLIED_DOSE' or event == 'SPELL_AURA_REFRESH' then
 		aura:SetDuration(GetTime(), aura.duration)
 	end
@@ -352,9 +351,12 @@ function unitProto:HasAura(name)
 	return self.auras[name] ~= nil
 end
 
-function unitProto:GetAura(name, icon, auraType, noSpawn)
+function unitProto:GetAura(name, auraType, icon)
 	local aura = self.auras[name]
-	if not aura and not noSpawn then
+	if not aura then
+		if not icon then
+			icon = select(3, GetSpellInfo(name))
+		end
 		aura = auraProto:Acquire(self, name, icon, auraType)
 		self.auras[name] = aura
 		self:Layout()
