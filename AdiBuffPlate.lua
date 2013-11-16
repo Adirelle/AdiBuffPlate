@@ -391,7 +391,11 @@ end
 
 local function SortAuras(a, b)
 	if a.scale == b.scale then
-		return a.expireTime < b.expireTime
+		if a.expireTime and b.expireTime then
+			return a.expireTime < b.expireTime
+		else
+			return a.spell < b.spell
+		end
 	else
 		return a.scale > b.scale
 	end
@@ -549,7 +553,9 @@ function auraProto:SetScale(scale)
 	if scale ~= self.scale then
 		self.scale = scale
 		self:SetSize(ICON_SIZE * scale, ICON_SIZE * scale)
-		self.unitFrame:Layout()
+		if self.unitFrame then
+			self.unitFrame:Layout()
+		end
 	end
 end
 
@@ -567,7 +573,9 @@ function auraProto:SetDuration(start, duration)
 		self:SetScript('OnUpdate', nil)
 		self.Countdown:Hide()
 	end
-	self.unitFrame:Layout()
+	if self.unitFrame then
+		self.unitFrame:Layout()
+	end
 end
 
 --------------------------------------------------------------------------------
