@@ -205,7 +205,7 @@ function addon:ScanUnit(event, unit)
 		local accepted, scale = self:AcceptAura(auraType, spellId, isMine, duration)
 		if accepted then
 			unitFrame = unitFrame or addon:GetUnitFrameForGUID(guid)
-			local aura = unitFrame:GetAura(name, auraType, icon)
+			local aura = unitFrame:GetAura(spellId, auraType, icon)
 			aura:SetDuration(expireTime-duration, duration)
 			aura:SetCount(count)
 			aura:SetScale(scale)
@@ -213,9 +213,9 @@ function addon:ScanUnit(event, unit)
 		end
 	end
 	if unitFrame then
-		for name, aura in pairs(unitFrame.auras) do
+		for spellId, aura in pairs(unitFrame.auras) do
 			if aura.gen ~= gen then
-				unitFrame:RemoveAura(name)
+				unitFrame:RemoveAura(spellId)
 			end
 		end
 	elseif unitFrames[guid] then
@@ -278,7 +278,7 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceNam
 		local accepted, scale = self:AcceptAura(auraType, spellId, isMine, huge)
 		if accepted then
 			local unitFrame = addon:GetUnitFrameForGUID(destGUID)
-			local aura = unitFrame:GetAura(spellName, auraType)
+			local aura = unitFrame:GetAura(spellId, auraType)
 			aura:SetCount(auraAmount)
 			aura:SetScale(scale)
 		end
@@ -295,13 +295,13 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceNam
 		return
 	end
 
-	if not unitFrame:HasAura(spellName) then return end
+	if not unitFrame:HasAura(spellId) then return end
 
 	if event == 'SPELL_AURA_REMOVED' then
-		unitFrame:RemoveAura(spellName)
+		unitFrame:RemoveAura(spellId)
 	end
 
-	local aura = unitFrame:GetAura(spellName, auraType)
+	local aura = unitFrame:GetAura(spellId, auraType)
 	if event == 'SPELL_AURA_APPLIED_DOSE' or event == 'SPELL_AURA_REFRESH' then
 		aura:SetDuration(GetTime(), aura.duration)
 	end
@@ -344,27 +344,27 @@ function unitProto:OnHide()
 	self:SetNameplate(nil)
 end
 
-function unitProto:HasAura(name)
-	return self.auras[name] ~= nil
+function unitProto:HasAura(spellId)
+	return self.auras[spellId] ~= nil
 end
 
-function unitProto:GetAura(name, auraType, icon)
-	local aura = self.auras[name]
+function unitProto:GetAura(spellId, auraType, icon)
+	local aura = self.auras[spellId]
 	if not aura then
 		if not icon then
-			icon = select(3, GetSpellInfo(name))
+			icon = select(3, GetSpellInfo(spellId))
 		end
-		aura = auraProto:Acquire(self, name, icon, auraType)
-		self.auras[name] = aura
+		aura = auraProto:Acquire(self, spellId, icon, auraType)
+		self.auras[spellId] = aura
 		self:Layout()
 	end
 	return aura
 end
 
-function unitProto:RemoveAura(name)
-	local aura = self.auras[name]
+function unitProto:RemoveAura(spellId)
+	local aura = self.auras[spellId]
 	if not aura then return end
-	self.auras[name] = nil
+	self.auras[spellId] = nil
 	aura:Release()
 	if next(self.auras) then
 		self:Layout()
