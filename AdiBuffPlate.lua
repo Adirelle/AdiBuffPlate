@@ -54,21 +54,16 @@ end
 
 local addon = LibStub('AceAddon-3.0'):NewAddon(addonName, 'AceEvent-3.0', 'LibNameplateRegistry-1.0')
 
-local function NewFrameHeap(namePrefix, frameType, parent, template)
-	--local baseFrame = CreateFrame(frameType, nil, parent, template)
-	--local proto = setmetatable({}, {__index = getmetatable(baseFrame).__index})
-	--local meta = {__index = proto}
-	local proto = {}
+local baseFrame = CreateFrame("Frame")
+local function NewFrameHeap(namePrefix)
+	local proto = setmetatable({}, {__index = baseFrame})
+	local meta = {__index = proto}
 	local heap = {}
 	local counter = 1
 	function proto:Acquire(...)
 		local self = next(heap)
 		if not self then
-			--self = setmetatable(CreateFrame(frameType, namePrefix..counter, parent, template), meta)
-			self = CreateFrame(frameType, namePrefix..counter, parent, template)
-			for k,v in pairs(proto) do
-				self[k] = v
-			end
+			self = setmetatable(CreateFrame("Frame", namePrefix..counter), meta)
 			counter = counter + 1
 			if self.OnInitialize then
 				self:OnInitialize()
@@ -101,8 +96,8 @@ else
 end
 --@end-debug@
 
-local auraProto = NewFrameHeap(addonName.."_Aura", "Frame")
-local unitProto = NewFrameHeap(addonName.."_Unit","Frame")
+local auraProto = NewFrameHeap(addonName.."_Aura")
+local unitProto = NewFrameHeap(addonName.."_Unit")
 local unitFrames = {}
 
 auraProto.Debug = addon.Debug
