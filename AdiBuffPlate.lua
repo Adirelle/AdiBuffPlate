@@ -77,12 +77,14 @@ local function NewFrameHeap(namePrefix)
 		return self
 	end
 	function proto:Release()
+		if heap[self] then return end
+		heap[self] = true
+		self:Hide()
+		self:SetParent(nil)
+		self:ClearAllPoints()
 		if self.OnRelease then
 			self:OnRelease()
 		end
-		self:Hide()
-		self:SetParent(nil)
-		heap[self] = true
 	end
 	return proto
 end
