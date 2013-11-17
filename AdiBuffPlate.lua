@@ -332,6 +332,7 @@ function unitProto:OnRelease()
 	for spell, aura in pairs(self.auras) do
 		aura:Release()
 	end
+	wipe(self.auras)
 end
 
 function unitProto:OnShow()
