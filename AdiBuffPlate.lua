@@ -430,14 +430,14 @@ function unitProto:DoLayout()
 			if prevDebuff then
 				aura:SetPoint("TOPLEFT", prevDebuff, "TOPRIGHT")
 			else
-				aura:SetPoint("TOPLEFT")
+				aura:SetPoint("TOPLEFT", self)
 			end
 			prevDebuff = aura
 		else
 			if prevBuff then
 				aura:SetPoint("TOPRIGHT", prevBuff, "TOPLEFT")
 			else
-				aura:SetPoint("TOPRIGHT")
+				aura:SetPoint("TOPRIGHT", self)
 			end
 			prevBuff = aura
 		end
