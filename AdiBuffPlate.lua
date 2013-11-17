@@ -495,10 +495,6 @@ function auraProto:OnAcquire(unitFrame, spell, texture, type)
 end
 
 function auraProto:OnRelease()
-	self:Hide()
-	self:SetParent(nil)
-	self:ClearAllPoints()
-	self:SetParent(nil)
 	self.unitFrame = nil
 end
 
