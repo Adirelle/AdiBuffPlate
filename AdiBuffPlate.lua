@@ -417,7 +417,8 @@ function unitProto:DoLayout()
 	end
 	self:Debug('Layout')
 
-	for _, aura in pairs(self.auras) do
+	wipe(tmp)
+	for name, aura in pairs(self.auras) do
 		tinsert(tmp, aura)
 	end
 	local height = 0
@@ -443,7 +444,6 @@ function unitProto:DoLayout()
 		height = max(height, aura:GetHeight())
 	end
 	self:SetHeight(height)
-	wipe(tmp)
 end
 
 -- Aura frame methods
