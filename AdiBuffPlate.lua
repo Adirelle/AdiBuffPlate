@@ -170,7 +170,7 @@ function addon:AcceptAura(auraType, spellId, isMine, duration)
 		return true, 1.5
 	elseif auraType == "BUFF" and LibDispellable:IsEnrageEffect(spellId) then
 		return true, 1.5
-	elseif isMine and duration > 5 and duration <= 300 then
+	elseif isMine and (not duration or (duration >= 6 and duration < 400)) then
 		return true, 1
 	else
 		return false
@@ -195,8 +195,6 @@ local function iterateAuras(unit, index)
 	end
 end
 
-local durationCache = {}
-
 local gen = 0
 function addon:ScanUnit(event, unit)
 	local guid = UnitGUID(unit)
@@ -215,9 +213,6 @@ function addon:ScanUnit(event, unit)
 			duration, expireTime = huge, huge
 		end
 		local isMine = (caster == "player" or caster == "pet" or caster == "vehicle")
-		if duration < huge then
-			durationCache[spellId] = duration
-		end
 		local accepted, scale = self:AcceptAura(auraType, spellId, isMine, duration)
 		if accepted then
 			unitFrame = unitFrame or addon:GetUnitFrameForGUID(guid)
@@ -291,7 +286,7 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceNam
 
 	if event == 'SPELL_AURA_APPLIED' then
 		local isMine = band(sourceFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) ~= 0
-		local accepted, scale = self:AcceptAura(auraType, spellId, isMine, durationCache[spellId] or 10)
+		local accepted, scale = self:AcceptAura(auraType, spellId, isMine)
 		if accepted then
 			local unitFrame = addon:GetUnitFrameForGUID(destGUID)
 			local aura = unitFrame:GetAura(spellId, auraType)
