@@ -126,13 +126,9 @@ function addon:OnEnable()
 	self:RegisterEvent('UPDATE_MOUSEOVER_UNIT')
 	self:RegisterEvent('COMBAT_LOG_EVENT_UNFILTERED')
 	self:RegisterEvent('PLAYER_DEAD')
-	self:LNR_RegisterCallback('LNR_ON_NEW_PLATE', 'NewPlate')
-	self:LNR_RegisterCallback('LNR_ON_GUID_FOUND', 'PlateGUIDFound')
-	self:LNR_RegisterCallback('LNR_ON_RECYCLE_PLATE', 'RecyclePlate')
 end
 
 function addon:OnDisable()
-	self:LNR_UnregisterAllCallbacks()
 	for guid, unitFrame in pairs(unitFrames) do
 		unitFrame:Release()
 	end
@@ -140,26 +136,6 @@ end
 
 function addon:GetUnitFrameForGUID(guid, noSpawn)
 	return guid and (unitFrames[guid] or (not noSpawn and unitProto:Acquire(guid)))
-end
-
-function addon:NewPlate(event, nameplate, data)
-	if data.GUID then
-		return self:PlateGUIDFound(event, nameplate, data.GUID)
-	end
-end
-
-function addon:PlateGUIDFound(event, nameplate, guid)
-	if unitFrames[guid] then
-		unitFrames[guid]:SetNameplate(nameplate)
-	end
-end
-
-function addon:RecyclePlate(event, nameplate, data)
-	local unitFrame = data.GUID and unitFrames[data.GUID]
-	if unitFrame and unitFrame.nameplate == nameplate then
-		self:Debug('RecyclePlate', event, 'nameplate=', nameplate, 'GUID=', data.GUID, 'unitFrame=', unitFrame)
-		unitFrame:SetNameplate(nil)
-	end
 end
 
 local testPlayerBuff = LibStub('LibPlayerSpells-1.0'):GetSpellTester("SURVIVAL IMPORTANT MANA_REGEN", "AURA")
@@ -335,11 +311,15 @@ function unitProto:OnAcquire(guid)
 	unitFrames[guid] = self
 	self.guid = guid
 	self:SetNameplate(addon:GetPlateByGUID(guid))
+	addon.LNR_RegisterCallback(self, 'LNR_ON_NEW_PLATE', 'OnNewPlate')
+	addon.LNR_RegisterCallback(self, 'LNR_ON_GUID_FOUND', 'OnPlateGUIDFound')
+	addon.LNR_RegisterCallback(self, 'LNR_ON_RECYCLE_PLATE', 'OnRecyclePlate')
 end
 
 function unitProto:OnRelease()
 	self:SetNameplate(nil)
 	unitFrames[self.guid] = nil
+	addon.LNR_UnregisterAllCallbacks(self)
 	for spell, aura in pairs(self.auras) do
 		aura:Release()
 	end
@@ -354,6 +334,27 @@ end
 function unitProto:OnHide()
 	self:Debug('OnHide')
 	self:SetNameplate(nil)
+end
+
+function unitProto:OnNewPlate(event, nameplate, data)
+	if data.GUID and data.GUID == self.guid then
+		self:Debug('Attaching to new nameplate', nameplate)
+		self:SetNameplate(nameplate)
+	end
+end
+
+function unitProto:OnPlateGUIDFound(event, nameplate, guid)
+	if guid == self.guid then
+		self:Debug('Attaching to nameplate', nameplate)
+		self:SetNameplate(nameplate)
+	end
+end
+
+function unitProto:OnRecyclePlate(event, nameplate, data)
+	if nameplate == self.nameplate then
+		self:Debug('Detaching from nameplate to recycle', nameplate)
+		self:SetNameplate(nil)
+	end
 end
 
 function unitProto:HasAura(spellId)
