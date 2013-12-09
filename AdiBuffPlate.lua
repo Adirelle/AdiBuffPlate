@@ -511,14 +511,18 @@ function auraProto:OnAcquire(unitFrame, spell, texture, type)
 end
 
 function auraProto:OnRelease()
+	local unitFrame = self.unitFrame
 	self.unitFrame = nil
+	if unitFrame and self.spell then
+		unitFrame:RemoveAura(self.spell)
+	end
 end
 
 function auraProto:OnUpdate(elapsed)
 	local now = GetTime()
 	local timeLeft = self.expireTime - now
-	if timeLeft <=0 then
-		return self.unitFrame:RemoveAura(self)
+	if timeLeft <= 0 then
+		return self:Release()
 	end
 	local countdown = self.Countdown
 	if timeLeft < self.flashTime or self.scale > 1.0 then
