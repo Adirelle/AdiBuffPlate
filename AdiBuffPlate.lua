@@ -205,6 +205,9 @@ function addon:ScanUnit(event, unit)
 				unitFrame:RemoveAura(spellId)
 			end
 		end
+		if unitFrame.nameplate == nil then
+			unitFrame:SetNameplate(self:GetPlateByGUID(guid))
+		end
 	elseif unitFrames[guid] then
 		unitFrames[guid]:Release()
 	end
