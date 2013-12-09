@@ -6,7 +6,7 @@
 ## Version: @project-version@
 #-# LoadManagers: AddonLoader
 #-# X-LoadOn-Always: delayed
-## OptionalDeps: Ace3, LibNameplateRegistry-1.0, DRData-1.0, LibDispellable-1.0, AdiDebug
+## OptionalDeps: Ace3, LibNameplateRegistry-1.0, DRData-1.0, LibDispellable-1.0, LibPlayerSpells-1.0, AdiDebug
 ## SavedVariables: AdiBuffPlateDB
 
 AdiBuffPlate.lua
