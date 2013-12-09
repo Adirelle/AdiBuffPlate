@@ -184,6 +184,8 @@ local function iterateAuras(unit, index)
 	end
 end
 
+local durationCache = {}
+
 local gen = 0
 function addon:ScanUnit(event, unit)
 	local guid = UnitGUID(unit)
@@ -202,6 +204,9 @@ function addon:ScanUnit(event, unit)
 			duration, expireTime = huge, huge
 		end
 		local isMine = (caster == "player" or caster == "pet" or caster == "vehicle")
+		if duration < huge then
+			durationCache[spellId] = duration
+		end
 		local accepted, scale = self:AcceptAura(auraType, spellId, isMine, duration)
 		if accepted then
 			unitFrame = unitFrame or addon:GetUnitFrameForGUID(guid)
@@ -275,7 +280,7 @@ function addon:COMBAT_LOG_EVENT_UNFILTERED(_, _, event, _, sourceGUID, sourceNam
 
 	if event == 'SPELL_AURA_APPLIED' then
 		local isMine = band(sourceFlags, COMBATLOG_OBJECT_AFFILIATION_MINE) ~= 0
-		local accepted, scale = self:AcceptAura(auraType, spellId, isMine, huge)
+		local accepted, scale = self:AcceptAura(auraType, spellId, isMine, durationCache[spellId] or 10)
 		if accepted then
 			local unitFrame = addon:GetUnitFrameForGUID(destGUID)
 			local aura = unitFrame:GetAura(spellId, auraType)
